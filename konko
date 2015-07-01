@@ -1,0 +1,631 @@
+#!/usr/bin/env python3
+
+import glob
+import json
+import os
+import re
+import sys
+import xlsxwriter
+import lxml.html
+from lxml.builder import E
+from lxml import etree
+
+
+CSS = """
+.sep, .tag, .del {
+    color: #999;
+}
+.tag, .del {
+    font-size: 0.8em;
+}
+.show {
+    color: #00f;
+    font-weight: 700;
+}
+.match {
+    color: #d00;
+    font-weight: 700;
+}
+:target {
+    text-decoration: underline;
+}
+"""
+
+SPACE = re.compile('\s+')
+
+
+def listglob(globs):
+    l = []
+    for x in globs:
+        l += glob.glob(x)
+    return l
+
+
+def exception_exit(msg):
+    t, v, tb = sys.exc_info()
+    print('{}.{}: {}'.format(t.__module__, t.__name__, v), file=sys.stderr)
+    sys.exit(msg)
+
+
+def safe_regex(x, flags):
+    try:
+        return re.compile(x, flags)
+    except:
+        exception_exit('error parsing regex: {}'.format(x))
+
+
+def try_search(re, w, i):
+    if re is None:
+        return None
+    else:
+        return re.search(w, i)
+
+
+def exact_match(re, w):
+    m = re.match(w)
+    return m is not None and m.start() == 0 and m.end() == len(w)
+
+
+def try_exact_match(re, w):
+    return re is not None and exact_match(re, w)
+
+
+def text_filter(s):
+    if s.isprintable():
+        return s
+    else:
+        return ''.join(c for c in s if c.isprintable() or c == '\n')
+
+
+class Token:
+    def html(self):
+        i = self.html_id()
+        k = self.html_class()
+        attr = {}
+        if len(k) > 0:
+            attr["class"] = " ".join(k)
+        if i is not None:
+            attr["id"] = i
+        if len(attr) > 0:
+            return E.span(self.text, **attr)
+        else:
+            return self.text
+
+    def process0(self):
+        self.delete = False
+        self.text = text_filter(self.raw)
+        self.simpletext = SPACE.sub(' ', self.text)
+
+
+class Word(Token):
+    def html_id(self):
+        if self.delete:
+            return None
+        if len(self.match) == 0:
+            return None
+        return "l{}c{}".format(self.line, self.char)
+
+    def html_class(self):
+        k = []
+        if self.delete:
+            k.append("del")
+        elif len(self.match) > 0:
+            k.append("match")
+        return k
+
+    def process(self, conc):
+        self.match = []
+        for search in conc.search:
+            if exact_match(search.re, self.raw):
+                self.match.append(search)
+
+    def set_context(self, f, i, prev):
+        assert f.tokens[i] == self
+        if prev is None:
+            self.tag = None
+        else:
+            self.tag = prev.simpletext
+        self.after = self.get_context(f, i, +1)
+        self.before = reversed(self.get_context(f, i, -1))
+
+    def get_context(self, f, i, d):
+        ctx = []
+        j = i + d
+        l = 0
+        while 0 <= j < len(f.tokens) and l < f.conc.context:
+            t = f.tokens[j]
+            if not t.delete:
+                fmt, txt = t.for_context()
+                l += len(txt)
+                ctx.append((fmt, txt))
+            j += d
+        return ctx
+
+    def for_context(self):
+        if len(self.match) > 0:
+            return "hl", self.simpletext
+        else:
+            return "normal", self.simpletext
+
+
+class Tag(Token):
+    def html_id(self):
+        return None
+
+    def html_class(self):
+        k = ["tag"]
+        if self.delete:
+            k.append("del")
+        if self.show_prev:
+            k.append("show")
+        return k
+
+    def descr(self):
+        return 'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
+
+    def process(self, conc):
+        self.show_prev = try_exact_match(conc.show_prev, self.raw)
+        for a in conc.delete:
+            if exact_match(a, self.raw):
+                self.delete = True
+        self.delete_open = []
+        self.delete_close = []
+        for i, a in enumerate(conc.delete_pair):
+            a1, a2 = a
+            if exact_match(a1, self.raw):
+                self.delete_open.append(i)
+            if exact_match(a2, self.raw):
+                self.delete_close.append(i)
+
+    def for_context(self):
+        return "light", self.simpletext
+
+
+class Sep(Token):
+    def html_id(self):
+        return None
+
+    def html_class(self):
+        return ["sep"]
+
+    def process(self, conc):
+        pass
+
+    def for_context(self):
+        return "normal", self.simpletext
+
+
+class File:
+    def __init__(self, source, filename):
+        self.source = source
+        self.conc = source.conc
+        self.filename = filename
+        base, ext = os.path.splitext(os.path.basename(self.filename))
+        htmlfile = base + ".html"
+        self.basename = base
+        self.htmlpath = os.path.join(self.conc.output_dir, self.source.key, htmlfile)
+
+    def read(self):
+        with open(self.filename, encoding=self.conc.encoding) as f:
+            self.data = f.read()
+
+    def process(self):
+        self.parse()
+        self.clean()
+        self.report()
+
+    def write(self):
+        doc = self.get_html()
+        with open(self.htmlpath, "bw") as f:
+            f.write(b'<!DOCTYPE html>\n')
+            f.write(lxml.html.tostring(doc))
+            f.write(b'\n')
+
+    def get_html(self):
+        content = [t.html() for t in self.tokens]
+        head = E.head(
+            E.title(self.basename),
+            E.meta(charset="UTF-8"),
+            E.style(CSS),
+        )
+        body = E.body(E.pre(*content))
+        return E.html(head, body, lang="en")
+
+    def parse(self):
+        self.tokens = []
+        self.line = 1
+        self.char = 1
+        self.prev = 0
+        n = len(self.data)
+        while self.prev < n:
+            tag = try_search(self.conc.tag, self.data, self.prev)
+            word = try_search(self.conc.word, self.data, self.prev)
+            if tag is not None and tag.start() < word.start():
+                a = tag.start()
+                b = tag.end()
+                self.feed(Sep, a)
+                self.feed(Tag, b)
+            elif word is not None:
+                a = word.start()
+                b = word.end()
+                if tag is not None and tag.start() < b:
+                    b = tag.start()
+                self.feed(Sep, a)
+                self.feed(Word, b)
+            else:
+                self.feed(Sep, n)
+
+    def feed(self, kind, b):
+        a = self.prev
+        assert a <= b
+        self.prev = b
+        if a == b:
+            return
+        raw = self.data[a:b]
+        t = kind()
+        t.raw = raw
+        t.start = a
+        t.line = self.line
+        t.char = self.char
+        t.process0()
+        t.process(self.conc)
+        self.tokens.append(t)
+        for c in raw:
+            if c == '\n':
+                self.line += 1
+                self.char = 1
+            else:
+                self.char += 1
+
+    def clean(self):
+        m = len(self.conc.delete_pair)
+        stack = [ [] for x in range(m) ]
+        delete_range = []
+        for j,t in enumerate(self.tokens):
+            if isinstance(t, Tag):
+                for x in t.delete_open:
+                    stack[x].append(j)
+                for x in t.delete_close:
+                    if len(stack[x]) == 0:
+                        self.conc.warn(self.filename, "{}: no matching opening tag".format(t.descr()))
+                    else:
+                        i = stack[x].pop()
+                        delete_range.append((i,j))
+        for l in stack:
+            for i in l:
+                t = self.tokens[i]
+                self.conc.warn(self.filename, "{}: no matching closing tag".format(t.descr()))
+        for i,j in delete_range:
+            for k in range(i,j+1):
+                self.tokens[k].delete = True
+        self.words = []
+        prev = None
+        for i,t in enumerate(self.tokens):
+            if isinstance(t, Tag) and not t.delete and t.show_prev:
+                prev = t
+            if isinstance(t, Word) and not t.delete:
+                self.words.append(t)
+                if len(t.match) > 0:
+                    t.set_context(self, i, prev)
+
+    def report(self):
+        for w in self.words:
+            for s in w.match:
+                s.add(w, self)
+
+
+class Source:
+    def __init__(self, conc, key, globs):
+        self.conc = conc
+        self.key = key
+        self.globs = globs
+
+    def process(self):
+        htmldir = os.path.join(self.conc.output_dir, self.key)
+        try:
+            os.makedirs(htmldir, exist_ok=True)
+        except:
+            exception_exit('error creating output directory: {}'.format(htmldir))
+        print(self.key, end=' ', flush=True)
+        skip = set(listglob(self.conc.skip_files))
+        l = listglob(self.globs)
+        l = [x for x in l if x not in skip]
+        self.files = []
+        for filename in l:
+            print('.', end='', flush=True)
+            f = File(self, filename)
+            self.files.append(f)
+            try:
+                f.read()
+            except:
+                print()
+                exception_exit('error reading input file: {}'.format(filename))
+            f.process()
+            try:
+                f.write()
+            except:
+                print()
+                exception_exit('error writing output file: {}'.format(f.htmlfile))
+        print()
+
+
+class Search:
+    def __init__(self, conc, key, re):
+        self.key = key
+        self.re = re
+        self.conc = conc
+
+    def define_formats(self):
+        self.fmt_bold = self.wb.add_format({'bold': True})
+        self.fmt_hl = self.wb.add_format({'bold': True, 'font_color': '#dd0000'})
+        self.fmt_word = self.wb.add_format({'align': 'center', 'bold': True})
+        self.fmt_right = self.wb.add_format({'align': 'right'})
+        self.fmt_light = self.wb.add_format({'font_color': '#999999'})
+
+    def set_formats(self):
+        self.ws.set_row(0, None, self.fmt_bold)
+        ctx = 1 + int(0.9 * self.conc.context)
+        num = 6
+        word = 15
+        self.ws.set_column(0, 0, num)
+        self.ws.set_column(1, 1, ctx, self.fmt_right)
+        self.ws.set_column(1, 1, ctx, self.fmt_right)
+        self.ws.set_column(2, 2, word, self.fmt_word)
+        self.ws.set_column(3, 3, ctx)
+        self.ws.set_column(4, 4, word)
+        self.ws.set_column(7, 8, num)
+        self.ws.freeze_panes(1, 0)
+
+    def write_head(self):
+        self.ws.write_string(self.r, 0, "N")
+        self.ws.write_string(self.r, 1, "Before")
+        self.ws.write_string(self.r, 2, "Word")
+        self.ws.write_string(self.r, 3, "After")
+        self.ws.write_string(self.r, 4, "Simple")
+        self.ws.write_string(self.r, 5, "Source")
+        self.ws.write_string(self.r, 6, "File")
+        self.ws.write_string(self.r, 7, "Line")
+        self.ws.write_string(self.r, 8, "Column")
+        self.ws.write_string(self.r, 9, "Tag")
+        self.r += 1
+
+    def add(self, word, f):
+        self.ws.write_number(self.r, 0, self.r)
+        self.write_rich(self.r, 1, word.before)
+        self.ws.write_string(self.r, 2, word.raw)
+        self.write_rich(self.r, 3, word.after)
+        self.ws.write_string(self.r, 4, word.raw.lower())
+        self.ws.write_string(self.r, 5, f.source.key)
+        self.ws.write_string(self.r, 6, f.basename)
+        self.ws.write_number(self.r, 7, word.line)
+        self.ws.write_number(self.r, 8, word.char)
+        if word.tag is not None:
+            self.ws.write_string(self.r, 9, word.tag)
+        self.r += 1
+
+    def write_rich(self, r, c, t):
+        l = []
+        for fmt, txt in t:
+            if fmt == "light":
+                l.append(self.fmt_light)
+                l.append(txt)
+            elif fmt == "hl":
+                l.append(self.fmt_hl)
+                l.append(txt)
+            elif fmt == "normal":
+                l.append(txt)
+            else:
+                assert False, fmt
+        if len(l) > 0:
+            self.ws.write_rich_string(r, c, *l)
+
+    def wb_open(self):
+        xlsx = self.key + ".xlsx"
+        filename = os.path.join(self.conc.output_dir, xlsx)
+        try:
+            self.wb = xlsxwriter.Workbook(filename)
+        except:
+            exception_exit('error creating output file: {}'.format(filename))
+        self.define_formats()
+        self.ws = self.wb.add_worksheet()
+        self.r = 0
+        self.write_head()
+
+    def wb_close(self):
+        self.set_formats()
+        self.wb.close()
+
+
+class Conc:
+    def __init__(self):
+        self.search_flags = 0
+        self.tag_flags = 0
+        self.word_flags = 0
+        self.source = []
+        self.skip_files = []
+        self.search = []
+        self.delete = []
+        self.delete_pair = []
+        self.log_file = sys.stderr
+        self.show_prev = None
+        self.tag = None
+        self.word = re.compile(r"\w+([-']\w+)*")
+        self.output_dir = 'output'
+        self.encoding = 'ascii'
+        self.context = 100
+
+    def warn(self, filename, msg):
+        print('!', end='', flush=True)
+        self.log(filename, msg)
+
+    def log(self, filename, msg):
+        print('{}: {}'.format(filename, msg), file=self.log_file, flush=True)
+
+    def log_open(self):
+        filename = os.path.join(self.output_dir, "log.txt")
+        try:
+            self.log_file = open(filename, "w")
+        except:
+            exception_exit('error creating log file: {}'.format(filename))
+
+    def log_close(self):
+        self.log_file.close()
+        self.log_file = sys.stderr
+
+    def config_error(self, path, msg):
+        if len(path) == 0:
+            elem = 'root element'
+        else:
+            elem = 'element {}'.format('.'.join([str(x) for x in path]))
+        sys.exit('{}: {}: {}'.format(
+            self.config_file, elem, msg
+        ))
+
+    def config_type_error(self, path, exp, got):
+        self.config_error(path, 'expected {}, got {}'.format(
+            exp.__name__, type(got).__name__
+        ))
+
+    def config_key_error(self, path, key):
+        self.config_error(path, 'unsupported key "{}"'.format(key))
+
+    def config_get(self, path):
+        p = []
+        c = self.config
+        for e in path:
+            if not isinstance(c, dict):
+                self.config_type_error(p, dict, c)
+            if e not in c:
+                return None
+            c = c[e]
+        return c
+
+    def config_boolean(self, path, default):
+        v = self.config_get(path)
+        if v is None:
+            return default
+        elif isinstance(v, bool):
+            return v
+        else:
+            self.config_type_error(path, bool, v)
+
+    def config_expect(self, path, exp, got):
+        if not isinstance(got, exp):
+            self.config_type_error(path, exp, got)
+
+    def config_expect_string_list(self, path, got):
+        self.config_expect(path, list, got)
+        for i, v in enumerate(got):
+            p = path + [i]
+            self.config_expect(p, str, v)
+
+    def set_config(self, path0, val0):
+        self.config_expect(path0, dict, val0)
+        for key, v in val0.items():
+            p = path0 + [key]
+            if key == 'search-ignore-case':
+                self.config_expect(p, bool, v)
+                self.search_flags = re.IGNORECASE if v else 0
+            elif key == 'tag-ignore-case':
+                self.config_expect(p, bool, v)
+                self.tag_flags = re.IGNORECASE if v else 0
+            elif key == 'word-ignore-case':
+                self.config_expect(p, bool, v)
+                self.word_flags = re.IGNORECASE if v else 0
+        for key, v in val0.items():
+            p = path0 + [key]
+            if key in ('search-ignore-case', 'tag-ignore-case', 'word-ignore-case'):
+                pass
+            elif key == 'source':
+                self.set_config_source(p, v)
+            elif key == 'output-dir':
+                self.config_expect(p, str, v)
+                self.output_dir = v
+            elif key == 'encoding':
+                self.config_expect(p, str, v)
+                self.encoding = v
+            elif key == 'context':
+                self.config_expect(p, int, v)
+                self.context = v
+            elif key == 'search':
+                self.set_config_search(p, v)
+            elif key == 'skip-files':
+                self.config_expect_string_list(p, v)
+                self.skip_files += v
+            elif key == 'delete':
+                self.set_config_delete(p, v)
+            elif key == 'show-prev':
+                self.config_expect(p, str, v)
+                self.show_prev = safe_regex(v, self.tag_flags)
+            elif key == 'tag':
+                self.config_expect(p, str, v)
+                self.tag = safe_regex(v, self.tag_flags)
+            elif key == 'word':
+                self.config_expect(p, str, v)
+                self.word = safe_regex(v, self.word_flags)
+            else:
+                self.config_key_error(path0, key)
+
+    def set_config_source(self, path, v):
+        self.config_expect(path, dict, v)
+        for key, val in sorted(v.items()):
+            p = path + [key]
+            self.config_expect_string_list(p, val)
+            self.source.append(Source(self, key, val))
+
+    def set_config_search(self, path, v):
+        self.config_expect(path, dict, v)
+        for key, val in sorted(v.items()):
+            p = path + [key]
+            self.config_expect(p, str, val)
+            re = safe_regex(val, self.search_flags)
+            self.search.append(Search(self, key, re))
+
+    def set_config_delete(self, path, v):
+        self.config_expect(path, list, v)
+        for i, x in enumerate(v):
+            p = path + [i]
+            self.set_config_delete_one(p, x)
+
+    def set_config_delete_one(self, path, v):
+        self.config_expect_string_list(path, v)
+        l = [safe_regex(x, self.tag_flags) for x in v]
+        if len(l) == 1:
+            self.delete.append(l[0])
+        elif len(l) == 2:
+            self.delete_pair.append(l)
+        else:
+            self.config_error(path, 'expected 1 or 2 elements')
+
+    def read_config(self, config_file):
+        self.config_file = config_file
+        with open(config_file) as f:
+            cfg = json.load(f)
+            self.set_config([], cfg)        
+
+    def do(self):
+        try:
+            os.makedirs(self.output_dir, exist_ok=True)
+        except:
+            exception_exit('error creating output directory: {}'.format(self.output_dir))
+        self.log_open()
+        for search in self.search:
+            search.wb_open()
+        for source in self.source:
+            source.process()
+        for search in self.search:
+            search.wb_close()
+        self.log_close()
+
+
+def main():
+    param = sys.argv[1:]
+    if len(param) != 1:
+        sys.exit('usage: {} CONFIGURATION'.format(sys.argv[0]))
+    config, = param
+    conc = Conc()
+    conc.read_config(config)
+    conc.do()
+
+
+main()
