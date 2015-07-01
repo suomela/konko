@@ -27,7 +27,8 @@ CSS = """
     font-weight: 700;
 }
 :target {
-    text-decoration: underline;
+    color: #0a0;
+    font-size: 1.5em;
 }
 """
 
@@ -381,7 +382,10 @@ class Search:
         self.ws.set_column(2, 2, word, self.fmt_word)
         self.ws.set_column(3, 3, ctx)
         self.ws.set_column(4, 4, word)
+        self.ws.set_column(5, 5, self.width_source)
+        self.ws.set_column(6, 6, self.width_file)
         self.ws.set_column(7, 8, num)
+        self.ws.set_column(9, 9, self.width_tag)
         self.ws.freeze_panes(1, 0)
 
     def write_head(self):
@@ -403,12 +407,15 @@ class Search:
         self.ws.write_string(self.r, 2, word.raw)
         self.write_rich(self.r, 3, word.after)
         self.ws.write_string(self.r, 4, word.raw.lower())
-        self.ws.write_string(self.r, 5, f.source.key)
-        self.ws.write_url(self.r, 6, word.link(f), None, f.basename)
+        self.ws.write_url(self.r, 5, word.link(f), None, f.source.key)
+        self.width_source = max(self.width_source, len(f.source.key))
+        self.ws.write_string(self.r, 6, f.basename)
+        self.width_file = max(self.width_file, len(f.basename))
         self.ws.write_number(self.r, 7, word.line)
         self.ws.write_number(self.r, 8, word.char)
         if word.tag is not None:
             self.ws.write_string(self.r, 9, word.tag)
+            self.width_tag = max(self.width_tag, len(word.tag))
         self.r += 1
 
     def write_rich(self, r, c, t):
@@ -438,6 +445,9 @@ class Search:
         self.ws = self.wb.add_worksheet()
         self.r = 0
         self.write_head()
+        self.width_source = 5
+        self.width_file = 5
+        self.width_tag = 5
 
     def wb_close(self):
         self.set_formats()
