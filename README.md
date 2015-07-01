@@ -6,10 +6,12 @@ Usage
 -----
 
     ./konko CONFIGURATION
+    ./konko-server CONFIGURATION
 
 Example:
 
     ./konko example/ice.json
+    ./konko-server example/ice.json
 
 
 Dependencies

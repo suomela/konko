@@ -113,6 +113,11 @@ class Word(Token):
             k.append("match")
         return k
 
+    def link(self, f):
+        i = self.html_id()
+        assert i is not None
+        return '{}#{}'.format(f.url, i)
+
     def process(self, conc):
         self.match = []
         for search in conc.search:
@@ -201,9 +206,12 @@ class File:
         self.conc = source.conc
         self.filename = filename
         base, ext = os.path.splitext(os.path.basename(self.filename))
-        htmlfile = base + ".html"
+        self.htmlfile = base + ".html"
         self.basename = base
-        self.htmlpath = os.path.join(self.conc.output_dir, self.source.key, htmlfile)
+        self.url = 'http://localhost:{}/{}/{}'.format(
+            self.conc.server_port, self.source.key, self.htmlfile
+        )
+        self.htmlpath = os.path.join(self.conc.output_dir, self.source.key, self.htmlfile)
 
     def read(self):
         with open(self.filename, encoding=self.conc.encoding) as f:
@@ -396,7 +404,7 @@ class Search:
         self.write_rich(self.r, 3, word.after)
         self.ws.write_string(self.r, 4, word.raw.lower())
         self.ws.write_string(self.r, 5, f.source.key)
-        self.ws.write_string(self.r, 6, f.basename)
+        self.ws.write_url(self.r, 6, word.link(f), None, f.basename)
         self.ws.write_number(self.r, 7, word.line)
         self.ws.write_number(self.r, 8, word.char)
         if word.tag is not None:
@@ -453,6 +461,7 @@ class Conc:
         self.output_dir = 'output'
         self.encoding = 'ascii'
         self.context = 100
+        self.server_port = 8000
 
     def warn(self, filename, msg):
         print('!', end='', flush=True)
@@ -547,6 +556,9 @@ class Conc:
             elif key == 'context':
                 self.config_expect(p, int, v)
                 self.context = v
+            elif key == 'server-port':
+                self.config_expect(p, int, v)
+                self.server_port = v
             elif key == 'search':
                 self.set_config_search(p, v)
             elif key == 'skip-files':
