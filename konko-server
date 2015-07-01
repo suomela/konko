@@ -24,6 +24,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
 
+class Server(socketserver.TCPServer):
+    allow_reuse_address = True
+
+
 def main():
     global base_url
     param = sys.argv[1:]
@@ -34,7 +38,8 @@ def main():
     d = cfg.get('output-dir', 'output')
     p = cfg.get('server-port', 8000)
     os.chdir(d)
-    httpd = socketserver.TCPServer(("localhost", p), Handler)
+    httpd = Server(("localhost", p), Handler)
+    httpd.allow_reuse_address = True
     base_url = 'http://localhost:{}'.format(p)
     print('Server started, hit ctrl-c to stop.')
     print('{} now refers to {}'.format(base_url, os.getcwd()))
