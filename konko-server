@@ -7,9 +7,6 @@ import http.server
 import socketserver
 
 
-base_url = None
-
-
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         # Hyperlinks with anchors seem to work fine in Microsoft Excel.
@@ -20,7 +17,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         else:
             p = self.path.replace('%23', '#')
             self.send_response(301)
-            self.send_header('Location', base_url + p)
+            self.send_header('Location', self.server.base_url + p)
             self.end_headers()
 
 
@@ -29,7 +26,6 @@ class Server(socketserver.TCPServer):
 
 
 def main():
-    global base_url
     param = sys.argv[1:]
     if len(param) != 1:
         sys.exit('usage: {} CONFIGURATION'.format(sys.argv[0]))
@@ -40,9 +36,9 @@ def main():
     os.chdir(d)
     httpd = Server(("localhost", p), Handler)
     httpd.allow_reuse_address = True
-    base_url = 'http://localhost:{}'.format(p)
+    httpd.base_url = 'http://localhost:{}'.format(p)
     print('Server started, hit ctrl-c to stop.')
-    print('{} now refers to {}'.format(base_url, os.getcwd()))
+    print('{} now refers to {}'.format(httpd.base_url, os.getcwd()))
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
