@@ -21,7 +21,7 @@
         ["<X>", "</X>"],
         ["<&>", "</&>"]
     ],
-    "show-prev": "<\\$[A-Z]>",
+    "show-prev": "<\\$.*>",
     "search-ignore-case": true,
     "word-ignore-case": false,
     "tag-ignore-case": false
