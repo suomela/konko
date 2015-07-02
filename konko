@@ -120,6 +120,7 @@ class Word(Token):
         return '{}#{}'.format(f.url, i)
 
     def process(self, conc):
+        self.lemma = self.simpletext.lower()
         self.match = []
         for search in conc.search:
             if exact_match(search.re, self.raw):
@@ -212,6 +213,19 @@ class Sep(Token):
 
     def for_context(self):
         return "normal", self.simpletext
+
+
+class Counter:
+    def __init__(self):
+        self.distinct = set()
+        self.total = 0
+
+    def add(self, lemma):
+        self.total += 1
+        self.distinct.add(lemma)
+
+    def types(self):
+        return len(self.distinct)
 
 
 class File:
@@ -331,9 +345,12 @@ class File:
                     t.set_context(self, i, prev)
 
     def report(self):
+        counts = { s.key: Counter() for s in self.conc.search }
         for w in self.words:
             for s in w.match:
+                counts[s.key].add(w.lemma)
                 s.add(w, self)
+        self.conc.add(self, len(self.words), counts)
 
 
 class Source:
@@ -371,18 +388,34 @@ class Source:
         print()
 
 
-class Search:
-    def __init__(self, conc, key, re):
-        self.key = key
-        self.re = re
-        self.conc = conc
-
+class Excel:
     def define_formats(self):
         self.fmt_bold = self.wb.add_format({'bold': True})
         self.fmt_hl = self.wb.add_format({'bold': True, 'font_color': '#dd0000'})
         self.fmt_word = self.wb.add_format({'align': 'center', 'bold': True})
         self.fmt_right = self.wb.add_format({'align': 'right'})
         self.fmt_light = self.wb.add_format({'font_color': '#999999'})
+
+    def wb_open_helper(self, filename):
+        try:
+            self.wb = xlsxwriter.Workbook(filename)
+        except:
+            exception_exit('error creating output file: {}'.format(filename))
+        self.define_formats()
+        self.ws = self.wb.add_worksheet()
+        self.r = 0
+        self.write_head()
+
+    def wb_close(self):
+        self.set_formats()
+        self.wb.close()
+
+
+class Search(Excel):
+    def __init__(self, conc, key, re):
+        self.key = key
+        self.re = re
+        self.conc = conc
 
     def set_formats(self):
         self.ws.set_row(0, None, self.fmt_bold)
@@ -420,9 +453,9 @@ class Search:
     def add(self, word, f):
         self.ws.write_number(self.r, 0, self.r)
         self.write_rich(self.r, 1, word.before)
-        self.ws.write_string(self.r, 2, word.raw)
+        self.ws.write_string(self.r, 2, word.simpletext)
         self.write_rich(self.r, 3, word.after)
-        self.ws.write_string(self.r, 4, word.raw.lower())
+        self.ws.write_string(self.r, 4, word.lemma)
         self.ws.write_url(self.r, 5, word.link(f), None, f.source.key)
         self.width_source = max(self.width_source, len(f.source.key))
         self.ws.write_string(self.r, 6, f.basename)
@@ -455,14 +488,7 @@ class Search:
     def wb_open(self):
         xlsx = self.key + ".xlsx"
         filename = os.path.join(self.conc.output_dir, xlsx)
-        try:
-            self.wb = xlsxwriter.Workbook(filename)
-        except:
-            exception_exit('error creating output file: {}'.format(filename))
-        self.define_formats()
-        self.ws = self.wb.add_worksheet()
-        self.r = 0
-        self.write_head()
+        self.wb_open_helper(filename)
         self.width_source = 5
         self.width_file = 5
         self.width_tag = 5
@@ -472,7 +498,7 @@ class Search:
         self.wb.close()
 
 
-class Conc:
+class Conc(Excel):
     def __init__(self):
         self.search_flags = 0
         self.tag_flags = 0
@@ -643,18 +669,69 @@ class Conc:
             cfg = json.load(f)
             self.set_config([], cfg)        
 
+    def set_formats(self):
+        self.ws.set_row(0, None, self.fmt_bold)
+        num = 6
+        self.ws.set_column(0, 0, self.width_source)
+        self.ws.set_column(1, 1, self.width_file)
+        self.ws.set_column(2, 2, num)
+        c = 3
+        for s in self.search:
+            self.ws.set_column(c, c, num)
+            c += 1
+        for s in self.search:
+            self.ws.set_column(c, c, num)
+            c += 1
+        self.ws.freeze_panes(1, 0)
+
+    def write_head(self):
+        self.ws.write_string(self.r, 0, "Source")
+        self.ws.write_string(self.r, 1, "File")
+        self.ws.write_string(self.r, 2, "Words")
+        c = 3
+        for s in self.search:
+            self.ws.write_string(self.r, c, "{} tokens".format(s.key))
+            c += 1
+        for s in self.search:
+            self.ws.write_string(self.r, c, "{} types".format(s.key))
+            c += 1
+        self.r += 1
+
+    def add(self, f, words, counts):
+        self.ws.write_url(self.r, 0, f.url, None, f.source.key)
+        self.width_source = max(self.width_source, len(f.source.key))
+        self.ws.write_string(self.r, 1, f.basename)
+        self.width_file = max(self.width_file, len(f.basename))
+        self.ws.write_number(self.r, 2, words)
+        c = 3
+        for s in self.search:
+            self.ws.write_number(self.r, c, counts[s.key].total)
+            c += 1
+        for s in self.search:
+            self.ws.write_number(self.r, c, counts[s.key].types())
+            c += 1
+        self.r += 1
+
+    def wb_open(self):
+        xlsx = "summary.xlsx"
+        self.wb_open_helper(os.path.join(self.output_dir, xlsx))
+        self.width_source = 5
+        self.width_file = 5
+
     def do(self):
         try:
             os.makedirs(self.output_dir, exist_ok=True)
         except:
             exception_exit('error creating output directory: {}'.format(self.output_dir))
         self.log_open()
+        self.wb_open()
         for search in self.search:
             search.wb_open()
         for source in self.source:
             source.process()
         for search in self.search:
             search.wb_close()
+        self.wb_close()
         self.log_close()
 
 
