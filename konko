@@ -131,8 +131,10 @@ class Word(Token):
             self.tag = None
         else:
             self.tag = prev.simpletext
-        self.after = self.get_context(f, i, +1)
         self.before = reversed(self.get_context(f, i, -1))
+        self.after = self.get_context(f, i, +1)
+        self.left = self.get_context_simple(f, i, -1)
+        self.right = self.get_context_simple(f, i, +1)
 
     def get_context(self, f, i, d):
         ctx = []
@@ -146,6 +148,17 @@ class Word(Token):
                 ctx.append((fmt, txt))
             j += d
         return ctx
+
+    def get_context_simple(self, f, i, d):
+        CTX_WORDS = 4
+        ctx = []
+        j = i + d
+        while 0 <= j < len(f.tokens) and len(ctx) < CTX_WORDS:
+            t = f.tokens[j]
+            if not t.delete and isinstance(t, Word):
+                ctx.append(t.simpletext.lower())
+            j += d
+        return ' '.join(ctx)
 
     def for_context(self):
         if len(self.match) > 0:
@@ -386,6 +399,7 @@ class Search:
         self.ws.set_column(6, 6, self.width_file)
         self.ws.set_column(7, 8, num)
         self.ws.set_column(9, 9, self.width_tag)
+        self.ws.set_column(10, 11, None, self.fmt_light)
         self.ws.freeze_panes(1, 0)
 
     def write_head(self):
@@ -399,6 +413,8 @@ class Search:
         self.ws.write_string(self.r, 7, "Line")
         self.ws.write_string(self.r, 8, "Column")
         self.ws.write_string(self.r, 9, "Tag")
+        self.ws.write_string(self.r, 10, "Left")
+        self.ws.write_string(self.r, 11, "Right")
         self.r += 1
 
     def add(self, word, f):
@@ -416,6 +432,8 @@ class Search:
         if word.tag is not None:
             self.ws.write_string(self.r, 9, word.tag)
             self.width_tag = max(self.width_tag, len(word.tag))
+        self.ws.write_string(self.r, 10, word.left)
+        self.ws.write_string(self.r, 11, word.right)
         self.r += 1
 
     def write_rich(self, r, c, t):
