@@ -1,0 +1,25 @@
+{
+    "source": {
+        "ice-nz-spoken": [ "corpus/ice/ICE New Zealand/Corpus/S*.TXT" ],
+        "ice-nz-written": [ "corpus/ice/ICE New Zealand/Corpus/W*.TXT" ]
+    },
+    "output-dir": "output/ice-nz",
+    "encoding": "1252",
+    "context": 100,
+    "search": {
+        "ness": ".*(n[e']ss.*|snss)",
+        "ity": ".*([ie]t(y|ie).*|vty)"
+    },
+    "word": "\\w+([-']\\w+)*",
+    "tag": "<[^<> ]+>",
+    "delete": [
+        ["<.*#.*>"],
+        ["<O>", "</O>"],
+        ["<X>", "</X>"],
+        ["<&>", "</&>"]
+    ],
+    "show-prev": "<\\$.*>",
+    "search-ignore-case": true,
+    "word-ignore-case": false,
+    "tag-ignore-case": false
+}
