@@ -3,7 +3,7 @@
         "ice-india-spoken": [ "corpus/ice/ICE India/Corpus/S2b-04*.txt" ],
         "ice-india-written": [ "corpus/ice/ICE India/Corpus/W2b-03*.txt" ]
     },
-    "output-dir": "output",
+    "output-dir": "output/ice-india",
     "encoding": "1252",
     "context": 100,
     "search": {
