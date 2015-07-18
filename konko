@@ -38,7 +38,10 @@ SPACE = re.compile('\s+')
 def listglob(globs):
     l = []
     for x in globs:
-        l += glob.glob(x)
+        g = glob.glob(x)
+        if len(g) == 0:
+            sys.exit("pattern does not match any file: {}".format(x))
+        l += g
     return l
 
 
@@ -369,6 +372,8 @@ class Source:
         skip = set(listglob(self.conc.skip_files))
         l = listglob(self.globs)
         l = [x for x in l if x not in skip]
+        if len(l) == 0:
+            sys.exit("{}: after skipping, there are no files left".format(self.key))
         self.files = []
         for filename in l:
             print('.', end='', flush=True)
