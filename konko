@@ -9,6 +9,7 @@ import xlsxwriter
 import lxml.html
 from lxml.builder import E
 from lxml import etree
+import pathabbr
 
 
 CSS = """
@@ -232,10 +233,11 @@ class Counter:
 
 
 class File:
-    def __init__(self, source, filename):
+    def __init__(self, source, filename, shortname):
         self.source = source
         self.conc = source.conc
         self.filename = filename
+        self.shortname = shortname
         base, ext = os.path.splitext(os.path.basename(self.filename))
         self.htmlfile = base + ".html"
         self.basename = base
@@ -263,7 +265,7 @@ class File:
     def get_html(self):
         content = [t.html() for t in self.tokens]
         head = E.head(
-            E.title(self.basename),
+            E.title(self.shortname),
             E.meta(charset="UTF-8"),
             E.style(CSS),
         )
@@ -374,10 +376,11 @@ class Source:
         l = [x for x in l if x not in skip]
         if len(l) == 0:
             sys.exit("{}: after skipping, there are no files left".format(self.key))
+        shortnames = pathabbr.pathabbr(l)
         self.files = []
         for filename in l:
             print('.', end='', flush=True)
-            f = File(self, filename)
+            f = File(self, filename, shortnames[filename])
             self.files.append(f)
             try:
                 f.read()
@@ -465,8 +468,8 @@ class Search(Excel):
         self.ws.write_string(self.r, 5, word.lemma)
         self.ws.write_url(self.r, 6, word.link(f), None, f.source.key)
         self.width_source = max(self.width_source, len(f.source.key))
-        self.ws.write_string(self.r, 7, f.basename)
-        self.width_file = max(self.width_file, len(f.basename))
+        self.ws.write_string(self.r, 7, f.shortname)
+        self.width_file = max(self.width_file, len(f.shortname))
         self.ws.write_number(self.r, 8, word.line)
         self.ws.write_number(self.r, 9, word.char)
         if word.tag is not None:
@@ -707,8 +710,8 @@ class Conc(Excel):
     def add(self, f, words, counts):
         self.ws.write_url(self.r, 0, f.url, None, f.source.key)
         self.width_source = max(self.width_source, len(f.source.key))
-        self.ws.write_string(self.r, 1, f.basename)
-        self.width_file = max(self.width_file, len(f.basename))
+        self.ws.write_string(self.r, 1, f.shortname)
+        self.width_file = max(self.width_file, len(f.shortname))
         self.ws.write_number(self.r, 2, words)
         c = 3
         for s in self.search:
