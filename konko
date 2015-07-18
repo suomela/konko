@@ -9,6 +9,7 @@ import xlsxwriter
 import lxml.html
 from lxml.builder import E
 from lxml import etree
+import filtering
 import pathabbr
 
 
@@ -32,8 +33,6 @@ CSS = """
     font-size: 1.5em;
 }
 """
-
-SPACE = re.compile('\s+')
 
 
 def listglob(globs):
@@ -75,13 +74,6 @@ def try_exact_match(re, w):
     return re is not None and exact_match(re, w)
 
 
-def text_filter(s):
-    if s.isprintable():
-        return s
-    else:
-        return ''.join(c for c in s if c.isprintable() or c == '\n')
-
-
 class Token:
     def html(self):
         i = self.html_id()
@@ -98,8 +90,8 @@ class Token:
 
     def process0(self):
         self.delete = False
-        self.text = text_filter(self.raw)
-        self.simpletext = SPACE.sub(' ', self.text)
+        self.text = filtering.printable_nl(self.raw)
+        self.simpletext = filtering.printable_compact(self.raw)
 
 
 class Word(Token):
