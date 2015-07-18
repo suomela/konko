@@ -34,13 +34,20 @@ class UniqueNames:
             i = 1 if i is None else i + 1
 
 
+def printable_naming():
+    return UniqueNames(filtering.printable, number_printable)
+
+
+def safe_naming():
+    return UniqueNames(filtering.safe, number_safe)
+
 
 #### Unit tests
 
 
 class TestUniqueNames(unittest.TestCase):
     def test_printable(self):
-        u = UniqueNames(filtering.printable, number_printable)
+        u = printable_naming()
         for i in range(3):
             self.assertEqual(u.get('abc'), 'abc')
             self.assertEqual(u.get('123\n456'), '123 456')
@@ -57,7 +64,7 @@ class TestUniqueNames(unittest.TestCase):
             self.assertEqual(u.get('\0'), ' (3)')
 
     def test_safe(self):
-        u = UniqueNames(filtering.safe, number_safe)
+        u = safe_naming()
         for i in range(3):
             self.assertEqual(u.get('abc'), 'abc')
             self.assertEqual(u.get('123\n456'), '123-456')

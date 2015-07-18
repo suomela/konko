@@ -354,7 +354,7 @@ class Source:
         self.key = key
         self.globs = globs
         self.safename = conc.safenames.get(key)
-        self.safenames = naming.UniqueNames(filtering.safe, naming.number_safe)
+        self.safenames = naming.safe_naming()
 
     def process(self):
         self.url = self.conc.url + '/' + self.safename
@@ -519,7 +519,7 @@ class Conc(Excel):
         self.encoding = 'ascii'
         self.context = 100
         self.server_port = 8000
-        self.safenames = naming.UniqueNames(filtering.safe, naming.number_safe)
+        self.safenames = naming.safe_naming()
 
     def warn(self, filename, msg):
         print('!', end='', flush=True)
