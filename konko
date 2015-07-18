@@ -10,6 +10,7 @@ import lxml.html
 from lxml.builder import E
 from lxml import etree
 import filtering
+import naming
 import pathabbr
 
 
@@ -230,13 +231,10 @@ class File:
         self.conc = source.conc
         self.filename = filename
         self.shortname = shortname
-        base, ext = os.path.splitext(os.path.basename(self.filename))
-        self.htmlfile = base + ".html"
-        self.basename = base
-        self.url = 'http://localhost:{}/{}/{}'.format(
-            self.conc.server_port, self.source.key, self.htmlfile
-        )
-        self.htmlpath = os.path.join(self.conc.output_dir, self.source.key, self.htmlfile)
+        self.safename = source.safenames.get(shortname)
+        self.htmlfile = self.safename + ".html"
+        self.url = source.url + '/' + self.htmlfile
+        self.htmlpath = os.path.join(source.htmlpath, self.htmlfile)
 
     def read(self):
         with open(self.filename, encoding=self.conc.encoding) as f:
@@ -355,13 +353,16 @@ class Source:
         self.conc = conc
         self.key = key
         self.globs = globs
+        self.safename = conc.safenames.get(key)
+        self.safenames = naming.UniqueNames(filtering.safe, naming.number_safe)
 
     def process(self):
-        htmldir = os.path.join(self.conc.output_dir, self.key)
+        self.url = self.conc.url + '/' + self.safename
+        self.htmlpath = os.path.join(self.conc.output_dir, self.safename)
         try:
-            os.makedirs(htmldir, exist_ok=True)
+            os.makedirs(self.htmlpath, exist_ok=True)
         except:
-            exception_exit('error creating output directory: {}'.format(htmldir))
+            exception_exit('error creating output directory: {}'.format(self.htmlpath))
         print(self.key, end=' ', flush=True)
         skip = set(listglob(self.conc.skip_files))
         l = listglob(self.globs)
@@ -518,6 +519,7 @@ class Conc(Excel):
         self.encoding = 'ascii'
         self.context = 100
         self.server_port = 8000
+        self.safenames = naming.UniqueNames(filtering.safe, naming.number_safe)
 
     def warn(self, filename, msg):
         print('!', end='', flush=True)
@@ -721,6 +723,7 @@ class Conc(Excel):
         self.width_file = 5
 
     def do(self):
+        self.url = 'http://localhost:{}'.format(self.server_port)
         try:
             os.makedirs(self.output_dir, exist_ok=True)
         except:
