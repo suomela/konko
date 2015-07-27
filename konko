@@ -151,19 +151,6 @@ class Sep(Token):
         return "normal", self.simpletext
 
 
-class Counter:
-    def __init__(self):
-        self.distinct = set()
-        self.total = 0
-
-    def add(self, lemma):
-        self.total += 1
-        self.distinct.add(lemma)
-
-    def types(self):
-        return len(self.distinct)
-
-
 class File:
     def __init__(self, source, filename, shortname):
         self.source = source
@@ -279,7 +266,7 @@ class File:
                     t.set_context(self, i, prev)
 
     def report(self):
-        counts = { s.key: Counter() for s in self.conc.search }
+        counts = { s.key: kutil.Counter() for s in self.conc.search }
         for w in self.words:
             for s in w.match:
                 counts[s.key].add(w.lemma)

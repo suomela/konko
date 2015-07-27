@@ -44,3 +44,14 @@ def try_exact_match(re, w):
     return re is not None and exact_match(re, w)
 
 
+class Counter:
+    def __init__(self):
+        self.distinct = set()
+        self.total = 0
+
+    def add(self, v):
+        self.total += 1
+        self.distinct.add(v)
+
+    def types(self):
+        return len(self.distinct)
