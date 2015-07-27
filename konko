@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import collections
 import glob
 import os
 import sys
@@ -391,77 +392,55 @@ class Excel:
             kutil.exception_exit('error creating output file: {}'.format(filename))
         self.define_formats()
         self.ws = self.wb.add_worksheet()
-        self.r = 0
-        self.write_head()
+        self.widths = collections.defaultdict(int)
+        self.r = 1
 
     def wb_close(self):
-        self.set_formats()
+        self.ws.set_row(0, None, self.fmt_bold)
+        cols = self.get_columns()
+        self.r = 0
+        for c, col in enumerate(cols):
+            name = col[0]
+            self.write_string(c, name)
+        for c, col in enumerate(cols):
+            fmt = col[1] if len(col) > 1 else None
+            width = col[2] if len(col) > 2 else None
+            if width is None:
+                width = self.autoscale(c)
+            if fmt is None:
+                self.ws.set_column(c, c, width)
+            else:
+                self.ws.set_column(c, c, width, fmt)
+        self.ws.freeze_panes(1, 0)
         self.wb.close()
 
+    def autoscale(self, c):
+        t = 10
+        k = 0.8
+        w = self.widths[c] + 1
+        if w > t:
+            w = t + int(k * (w - t))
+        return w
 
-class Search(Excel):
-    def __init__(self, conc, key, re):
-        self.key = key
-        self.re = re
-        self.conc = conc
+    def tell(self, c, w):
+        self.widths[c] = max(self.widths[c], w)
 
-    def set_formats(self):
-        self.ws.set_row(0, None, self.fmt_bold)
-        ctx = 1 + int(0.9 * self.conc.config.context)
-        num = 6
-        word = 15
-        self.ws.set_column(0, 0, num)
-        self.ws.set_column(1, 1, ctx, self.fmt_right)
-        self.ws.set_column(1, 1, ctx, self.fmt_right)
-        self.ws.set_column(2, 2, word, self.fmt_word)
-        self.ws.set_column(3, 3, ctx)
-        self.ws.set_column(4, 5, word)
-        self.ws.set_column(6, 6, self.width_source)
-        self.ws.set_column(7, 7, self.width_file)
-        self.ws.set_column(8, 9, num)
-        self.ws.set_column(10, 10, self.width_tag)
-        self.ws.set_column(11, 12, None, self.fmt_light)
-        self.ws.freeze_panes(1, 0)
+    def write_number(self, c, v):
+        self.ws.write_number(self.r, c, v)
+        self.tell(c, len(str(v)))
 
-    def write_head(self):
-        self.ws.write_string(self.r, 0, "N")
-        self.ws.write_string(self.r, 1, "Before")
-        self.ws.write_string(self.r, 2, "Word")
-        self.ws.write_string(self.r, 3, "After")
-        self.ws.write_string(self.r, 4, "Simple")
-        self.ws.write_string(self.r, 5, "Lemma")
-        self.ws.write_string(self.r, 6, "Source")
-        self.ws.write_string(self.r, 7, "File")
-        self.ws.write_string(self.r, 8, "Line")
-        self.ws.write_string(self.r, 9, "Column")
-        self.ws.write_string(self.r, 10, "Tag")
-        self.ws.write_string(self.r, 11, "Left")
-        self.ws.write_string(self.r, 12, "Right")
-        self.r += 1
+    def write_string(self, c, v):
+        self.ws.write_string(self.r, c, v)
+        self.tell(c, len(v))
 
-    def add(self, word, f):
-        self.ws.write_number(self.r, 0, self.r)
-        self.write_rich(self.r, 1, word.before)
-        self.ws.write_string(self.r, 2, word.simpletext)
-        self.write_rich(self.r, 3, word.after)
-        self.ws.write_string(self.r, 4, word.lemma)
-        self.ws.write_string(self.r, 5, word.lemma)
-        self.ws.write_url(self.r, 6, word.link(f), None, f.source.key)
-        self.width_source = max(self.width_source, len(f.source.key))
-        self.ws.write_string(self.r, 7, f.shortname)
-        self.width_file = max(self.width_file, len(f.shortname))
-        self.ws.write_number(self.r, 8, word.line)
-        self.ws.write_number(self.r, 9, word.char)
-        if word.tag is not None:
-            self.ws.write_string(self.r, 10, word.tag)
-            self.width_tag = max(self.width_tag, len(word.tag))
-        self.ws.write_string(self.r, 11, word.left)
-        self.ws.write_string(self.r, 12, word.right)
-        self.r += 1
+    def write_url(self, c, url, v):
+        self.ws.write_url(self.r, c, url, None, v)
+        self.tell(c, len(v))
 
-    def write_rich(self, r, c, t):
+    def write_rich(self, c, v):
         l = []
-        for fmt, txt in t:
+        s = ""
+        for fmt, txt in v:
             if fmt == "light":
                 l.append(self.fmt_light)
                 l.append(txt)
@@ -472,20 +451,56 @@ class Search(Excel):
                 l.append(txt)
             else:
                 assert False, fmt
+            s += txt
         if len(l) > 0:
-            self.ws.write_rich_string(r, c, *l)
+            self.ws.write_rich_string(self.r, c, *l)
+        self.tell(c, len(s))
+
+
+class Search(Excel):
+    def __init__(self, conc, key, re):
+        self.key = key
+        self.re = re
+        self.conc = conc
+
+    def get_columns(self):
+        return [
+            ("N",),
+            ("Before", self.fmt_right),
+            ("Word", self.fmt_word),
+            ("After",),
+            ("Simple",),
+            ("Lemma",),
+            ("Source",),
+            ("File",),
+            ("Line",),
+            ("Column",),
+            ("Tag",),
+            ("Left", self.fmt_light, 10),
+            ("Right", self.fmt_light, 10),
+        ]
+
+    def add(self, word, f):
+        self.write_number(0, self.r)
+        self.write_rich(1, word.before)
+        self.write_string(2, word.simpletext)
+        self.write_rich(3, word.after)
+        self.write_string(4, word.lemma)
+        self.write_string(5, word.lemma)
+        self.write_url(6, word.link(f), f.source.key)
+        self.write_string(7, f.shortname)
+        self.write_number(8, word.line)
+        self.write_number(9, word.char)
+        if word.tag is not None:
+            self.write_string(10, word.tag)
+        self.write_string(11, word.left)
+        self.write_string(12, word.right)
+        self.r += 1
 
     def wb_open(self):
         xlsx = self.key + ".xlsx"
         filename = os.path.join(self.conc.config.output_dir, xlsx)
         self.wb_open_helper(filename)
-        self.width_source = 5
-        self.width_file = 5
-        self.width_tag = 5
-
-    def wb_close(self):
-        self.set_formats()
-        self.wb.close()
 
 
 class Conc(Excel):
@@ -514,54 +529,36 @@ class Conc(Excel):
         self.log_file.close()
         self.log_file = sys.stderr
 
-    def set_formats(self):
-        self.ws.set_row(0, None, self.fmt_bold)
+    def get_columns(self):
         num = 6
-        self.ws.set_column(0, 0, self.width_source)
-        self.ws.set_column(1, 1, self.width_file)
-        self.ws.set_column(2, 2, num)
-        c = 3
+        cols = [
+            ("Source",),
+            ("File",),
+            ("Words",),
+        ]
         for s in self.search:
-            self.ws.set_column(c, c, num)
-            c += 1
+            cols.append(("{} tokens".format(s.key),))
         for s in self.search:
-            self.ws.set_column(c, c, num)
-            c += 1
-        self.ws.freeze_panes(1, 0)
-
-    def write_head(self):
-        self.ws.write_string(self.r, 0, "Source")
-        self.ws.write_string(self.r, 1, "File")
-        self.ws.write_string(self.r, 2, "Words")
-        c = 3
-        for s in self.search:
-            self.ws.write_string(self.r, c, "{} tokens".format(s.key))
-            c += 1
-        for s in self.search:
-            self.ws.write_string(self.r, c, "{} types".format(s.key))
-            c += 1
-        self.r += 1
+            cols.append(("{} types".format(s.key),))
+        return cols
 
     def add(self, f, words, counts):
-        self.ws.write_url(self.r, 0, f.url, None, f.source.key)
-        self.width_source = max(self.width_source, len(f.source.key))
-        self.ws.write_string(self.r, 1, f.shortname)
-        self.width_file = max(self.width_file, len(f.shortname))
-        self.ws.write_number(self.r, 2, words)
+        self.write_url(0, f.url, f.source.key)
+        self.write_string(1, f.shortname)
+        self.write_number(2, words)
         c = 3
         for s in self.search:
-            self.ws.write_number(self.r, c, counts[s.key].total)
+            self.write_number(c, counts[s.key].total)
             c += 1
         for s in self.search:
-            self.ws.write_number(self.r, c, counts[s.key].types())
+            self.write_number(c, counts[s.key].types())
             c += 1
         self.r += 1
 
     def wb_open(self):
         xlsx = "summary.xlsx"
-        self.wb_open_helper(os.path.join(self.config.output_dir, xlsx))
-        self.width_source = 5
-        self.width_file = 5
+        filename = os.path.join(self.config.output_dir, xlsx)
+        self.wb_open_helper(filename)
 
     def do(self):
         self.url = 'http://localhost:{}'.format(self.config.server_port)
