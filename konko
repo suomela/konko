@@ -109,7 +109,7 @@ class Tag(Token):
         k = ["tag"]
         if self.delete:
             k.append("del")
-        if self.sample:
+        if self.samplekey is not None:
             k.append("sample")
         return k
 
@@ -117,7 +117,7 @@ class Tag(Token):
         return 'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
 
     def process(self, conc):
-        self.sample = kutil.try_exact_match(conc.config.sample, self.raw)
+        self.samplekey = kutil.try_capture_join(conc.config.sample, self.raw)
         for a in conc.config.delete:
             if kutil.exact_match(a, self.raw):
                 self.delete = True
@@ -255,8 +255,8 @@ class File:
         self.words = []
         samplekey = None
         for i,t in enumerate(self.tokens):
-            if isinstance(t, Tag) and not t.delete and t.sample:
-                samplekey = t.simpletext
+            if isinstance(t, Tag) and not t.delete and t.samplekey is not None:
+                samplekey = t.samplekey
             if isinstance(t, Word) and not t.delete:
                 self.words.append(t)
                 if len(t.match) > 0:
