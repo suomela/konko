@@ -585,8 +585,8 @@ def main():
     param = sys.argv[1:]
     if len(param) != 1:
         sys.exit('usage: {} CONFIGURATION'.format(sys.argv[0]))
-    config, = param
-    conc = Conc(config)
+    config_file, = param
+    conc = Conc(config_file)
     conc.do()
 
 
