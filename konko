@@ -62,12 +62,9 @@ class Word(Token):
             if kutil.exact_match(search.re, self.raw):
                 self.match.append(search)
 
-    def set_context(self, f, i, sample):
+    def set_context(self, f, i, samplekey):
         assert f.tokens[i] == self
-        if sample is None:
-            self.sample = None
-        else:
-            self.sample = sample.simpletext
+        self.samplekey = samplekey
         self.before = reversed(self.get_context(f, i, -1))
         self.after = self.get_context(f, i, +1)
         self.left = self.get_context_simple(f, i, -1)
@@ -256,14 +253,14 @@ class File:
             for k in range(i,j+1):
                 self.tokens[k].delete = True
         self.words = []
-        sample = None
+        samplekey = None
         for i,t in enumerate(self.tokens):
             if isinstance(t, Tag) and not t.delete and t.sample:
-                sample = t
+                samplekey = t.simpletext
             if isinstance(t, Word) and not t.delete:
                 self.words.append(t)
                 if len(t.match) > 0:
-                    t.set_context(self, i, sample)
+                    t.set_context(self, i, samplekey)
 
     def report(self):
         counts = { s.key: kutil.Counter() for s in self.conc.search }
@@ -347,7 +344,7 @@ class Search():
         self.xl.write_string(word.lemma)
         self.xl.write_url(word.link(f), f.source.key)
         self.xl.write_string(f.shortname)
-        self.xl.write_string(word.sample)
+        self.xl.write_string(word.samplekey)
         self.xl.write_number(word.line)
         self.xl.write_number(word.char)
         self.xl.write_string(word.left)
