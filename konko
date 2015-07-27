@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import collections
 import os
 import sys
 import lxml.html
@@ -117,7 +118,7 @@ class Tag(Token):
         return 'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
 
     def process(self, conc):
-        self.samplekey = kutil.try_capture_join(conc.config.sample, self.raw)
+        self.samplekey = kutil.try_capture(conc.config.sample, self.raw)
         for a in conc.config.delete:
             if kutil.exact_match(a, self.raw):
                 self.delete = True
@@ -158,6 +159,7 @@ class File:
         self.htmlfile = self.safename + ".html"
         self.url = source.url + '/' + self.htmlfile
         self.htmlpath = os.path.join(source.htmlpath, self.htmlfile)
+        self.samplenames = naming.printable_naming()
 
     def read(self):
         with open(self.filename, encoding=self.conc.config.encoding) as f:
@@ -253,21 +255,23 @@ class File:
             for k in range(i,j+1):
                 self.tokens[k].delete = True
         self.words = []
+        self.samples = collections.defaultdict(list)
         samplekey = None
         for i,t in enumerate(self.tokens):
             if isinstance(t, Tag) and not t.delete and t.samplekey is not None:
                 samplekey = t.samplekey
             if isinstance(t, Word) and not t.delete:
                 self.words.append(t)
+                self.samples[samplekey].append(t)
                 if len(t.match) > 0:
                     t.set_context(self, i, samplekey)
 
     def report(self):
         counts = { s.key: kutil.Counter() for s in self.conc.search }
         for w in self.words:
-            for s in w.match:
-                counts[s.key].add(w.lemma)
-                s.add(w, self)
+            for search in w.match:
+                counts[search.key].add(w.lemma)
+                search.add(w, self)
         self.conc.add(self, len(self.words), counts)
 
 
@@ -344,7 +348,7 @@ class Search():
         self.xl.write_string(word.lemma)
         self.xl.write_url(word.link(f), f.source.key)
         self.xl.write_string(f.shortname)
-        self.xl.write_string(word.samplekey)
+        self.xl.write_string(f.samplenames.get(word.samplekey))
         self.xl.write_number(word.line)
         self.xl.write_number(word.char)
         self.xl.write_string(word.left)
