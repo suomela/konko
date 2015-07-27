@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import glob
 import os
 import sys
 import lxml.html
@@ -13,32 +12,6 @@ import kconfig
 import kexcel
 import kstyle
 import kutil
-
-
-def listglob(globs):
-    l = []
-    for x in globs:
-        g = glob.glob(x)
-        if len(g) == 0:
-            sys.exit("pattern does not match any file: {}".format(x))
-        l += g
-    return l
-
-
-def try_search(re, w, i):
-    if re is None:
-        return None
-    else:
-        return re.search(w, i)
-
-
-def exact_match(re, w):
-    m = re.match(w)
-    return m is not None and m.start() == 0 and m.end() == len(w)
-
-
-def try_exact_match(re, w):
-    return re is not None and exact_match(re, w)
 
 
 class Token:
@@ -86,7 +59,7 @@ class Word(Token):
         self.lemma = self.simpletext.lower()
         self.match = []
         for search in conc.search:
-            if exact_match(search.re, self.raw):
+            if kutil.exact_match(search.re, self.raw):
                 self.match.append(search)
 
     def set_context(self, f, i, prev):
@@ -147,17 +120,17 @@ class Tag(Token):
         return 'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
 
     def process(self, conc):
-        self.show_prev = try_exact_match(conc.config.show_prev, self.raw)
+        self.show_prev = kutil.try_exact_match(conc.config.show_prev, self.raw)
         for a in conc.config.delete:
-            if exact_match(a, self.raw):
+            if kutil.exact_match(a, self.raw):
                 self.delete = True
         self.delete_open = []
         self.delete_close = []
         for i, a in enumerate(conc.config.delete_pair):
             a1, a2 = a
-            if exact_match(a1, self.raw):
+            if kutil.exact_match(a1, self.raw):
                 self.delete_open.append(i)
-            if exact_match(a2, self.raw):
+            if kutil.exact_match(a2, self.raw):
                 self.delete_close.append(i)
 
     def for_context(self):
@@ -235,8 +208,8 @@ class File:
         self.prev = 0
         n = len(self.data)
         while self.prev < n:
-            tag = try_search(self.conc.config.tag, self.data, self.prev)
-            word = try_search(self.conc.config.word, self.data, self.prev)
+            tag = kutil.try_search(self.conc.config.tag, self.data, self.prev)
+            word = kutil.try_search(self.conc.config.word, self.data, self.prev)
             if tag is not None and tag.start() < word.start():
                 a = tag.start()
                 b = tag.end()
@@ -330,8 +303,8 @@ class Source:
         except:
             kutil.exception_exit('error creating output directory: {}'.format(self.htmlpath))
         print(self.key, end=' ', flush=True)
-        skip = set(listglob(self.conc.config.skip_files))
-        l = listglob(self.globs)
+        skip = set(kutil.listglob(self.conc.config.skip_files))
+        l = kutil.listglob(self.globs)
         l = [x for x in l if x not in skip]
         if len(l) == 0:
             sys.exit("{}: after skipping, there are no files left".format(self.key))
