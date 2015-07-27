@@ -59,11 +59,15 @@ class TestUniqueNames(unittest.TestCase):
             self.assertEqual(u.get('abc\r'), 'abc  (1)')
             self.assertEqual(u.get('abc\t'), 'abc  (2)')
             self.assertEqual(u.get('äbc'), 'äbc')
+            self.assertEqual(u.get(('abc',)), 'abc (3)')
             self.assertEqual(u.get('123 456'), '123 456 (1)')
             self.assertEqual(u.get('123\t456'), '123 456 (2)')
+            self.assertEqual(u.get(('123', '456')), '123 456 (3)')
             self.assertEqual(u.get(''), '')
             self.assertEqual(u.get('\b'), ' (1)')
             self.assertEqual(u.get('\0'), ' (2)')
+            self.assertEqual(u.get(None), ' (3)')
+            self.assertEqual(u.get(()), ' (4)')
 
     def test_safe(self):
         u = safe_naming()
@@ -76,11 +80,15 @@ class TestUniqueNames(unittest.TestCase):
             self.assertEqual(u.get('abc\r'), 'abc-3')
             self.assertEqual(u.get('abc\t'), 'abc-4')
             self.assertEqual(u.get('äbc'), 'abc-5')
+            self.assertEqual(u.get(('abc',)), 'abc-6')
             self.assertEqual(u.get('123 456'), '123-456-1')
             self.assertEqual(u.get('123\t456'), '123-456-2')
+            self.assertEqual(u.get(('123', '456')), '123-456-3')
             self.assertEqual(u.get(''), '-')
             self.assertEqual(u.get('\b'), '--1')
             self.assertEqual(u.get('\0'), '--2')
+            self.assertEqual(u.get(None), '--3')
+            self.assertEqual(u.get(()), '--4')
 
 
 if __name__ == '__main__':
