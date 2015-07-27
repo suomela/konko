@@ -29,7 +29,7 @@ class UniqueNames:
                 val = norm
             else:
                 val = self.numbering(norm, i)
-            if val != '' and val not in self.used:
+            if val not in self.used:
                 self.used.add(val)
                 self.keymap[key] = val
                 return val
@@ -61,9 +61,9 @@ class TestUniqueNames(unittest.TestCase):
             self.assertEqual(u.get('äbc'), 'äbc')
             self.assertEqual(u.get('123 456'), '123 456 (1)')
             self.assertEqual(u.get('123\t456'), '123 456 (2)')
-            self.assertEqual(u.get(''), ' (1)')
-            self.assertEqual(u.get('\b'), ' (2)')
-            self.assertEqual(u.get('\0'), ' (3)')
+            self.assertEqual(u.get(''), '')
+            self.assertEqual(u.get('\b'), ' (1)')
+            self.assertEqual(u.get('\0'), ' (2)')
 
     def test_safe(self):
         u = safe_naming()
