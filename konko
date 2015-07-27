@@ -62,12 +62,12 @@ class Word(Token):
             if kutil.exact_match(search.re, self.raw):
                 self.match.append(search)
 
-    def set_context(self, f, i, prev):
+    def set_context(self, f, i, sample):
         assert f.tokens[i] == self
-        if prev is None:
-            self.tag = None
+        if sample is None:
+            self.sample = None
         else:
-            self.tag = prev.simpletext
+            self.sample = sample.simpletext
         self.before = reversed(self.get_context(f, i, -1))
         self.after = self.get_context(f, i, +1)
         self.left = self.get_context_simple(f, i, -1)
@@ -112,15 +112,15 @@ class Tag(Token):
         k = ["tag"]
         if self.delete:
             k.append("del")
-        if self.show_prev:
-            k.append("show")
+        if self.sample:
+            k.append("sample")
         return k
 
     def descr(self):
         return 'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
 
     def process(self, conc):
-        self.show_prev = kutil.try_exact_match(conc.config.show_prev, self.raw)
+        self.sample = kutil.try_exact_match(conc.config.sample, self.raw)
         for a in conc.config.delete:
             if kutil.exact_match(a, self.raw):
                 self.delete = True
@@ -256,14 +256,14 @@ class File:
             for k in range(i,j+1):
                 self.tokens[k].delete = True
         self.words = []
-        prev = None
+        sample = None
         for i,t in enumerate(self.tokens):
-            if isinstance(t, Tag) and not t.delete and t.show_prev:
-                prev = t
+            if isinstance(t, Tag) and not t.delete and t.sample:
+                sample = t
             if isinstance(t, Word) and not t.delete:
                 self.words.append(t)
                 if len(t.match) > 0:
-                    t.set_context(self, i, prev)
+                    t.set_context(self, i, sample)
 
     def report(self):
         counts = { s.key: kutil.Counter() for s in self.conc.search }
@@ -331,9 +331,9 @@ class Search():
             ("Lemma",),
             ("Source",),
             ("File",),
+            ("Sample",),
             ("Line",),
             ("Column",),
-            ("Tag",),
             ("Left", "light", 10),
             ("Right", "light", 10),
         ]
@@ -347,9 +347,9 @@ class Search():
         self.xl.write_string(word.lemma)
         self.xl.write_url(word.link(f), f.source.key)
         self.xl.write_string(f.shortname)
+        self.xl.write_string(word.sample)
         self.xl.write_number(word.line)
         self.xl.write_number(word.char)
-        self.xl.write_string(word.tag)
         self.xl.write_string(word.left)
         self.xl.write_string(word.right)
         self.xl.next_row()

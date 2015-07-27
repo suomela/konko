@@ -18,7 +18,7 @@
         ["<X>", "</X>"],
         ["<&>", "</&>"]
     ],
-    "show-prev": "<\\$[.*]>",
+    "sample": "<\\$.*>",
     "search-ignore-case": true,
     "word-ignore-case": false,
     "tag-ignore-case": false

@@ -16,7 +16,7 @@ css = """
 .tag, .del {
     font-size: 0.8em;
 }
-.show {
+.sample {
     color: #00f;
     font-weight: 700;
 }
