@@ -1,3 +1,5 @@
+"""Generating unique, printable names."""
+
 import unittest
 import filtering
 

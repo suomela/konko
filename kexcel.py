@@ -1,3 +1,5 @@
+"""Generating Excel files."""
+
 import collections
 import xlsxwriter
 import kstyle

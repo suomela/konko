@@ -1,3 +1,5 @@
+"""Generating safe, printable string."""
+
 import re
 import unicodedata
 import unittest

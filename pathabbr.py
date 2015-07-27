@@ -1,3 +1,5 @@
+"""Manipulating file name paths."""
+
 import os.path
 import unittest
 

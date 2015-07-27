@@ -1,3 +1,5 @@
+"""Reading Konko configuration file."""
+
 import json
 import re
 import sys

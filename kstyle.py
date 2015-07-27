@@ -1,3 +1,4 @@
+"""How to format Konko output."""
 
 excel_format = {
     "bold":  {'bold': True},

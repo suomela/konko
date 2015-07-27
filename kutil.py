@@ -1,3 +1,5 @@
+"""Miscellaneous utility functions."""
+
 import glob
 import re
 import sys
