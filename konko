@@ -78,8 +78,11 @@ class Word(Token):
     def set_context(self, text, i, sample):
         assert text.tokens[i] == self
         self.sample = sample
-        self.before = reversed(self.get_context(text, i, -1))
-        self.after = self.get_context(text, i, +1)
+        cb = self.get_context(text, i, -1)
+        ca = self.get_context(text, i, +1)
+        cb.reverse()
+        self.before = kexcel.rich_simplify(cb)
+        self.after = kexcel.rich_simplify(ca)
         self.left = self.get_context_simple(text, i, -1)
         self.right = self.get_context_simple(text, i, +1)
 

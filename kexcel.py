@@ -4,6 +4,7 @@ import collections
 import xlsxwriter
 import kstyle
 import kutil
+import unittest
 
 
 class Excel(object):
@@ -102,3 +103,31 @@ class Sheet(object):
     def _tell(self, w):
         self.widths[self.c] = max(self.widths[self.c], w)
 
+
+def rich_simplify(l):
+    if len(l) == 0:
+        return l
+    r = []
+    x0, y0 = l[0]
+    for x1, y1 in l[1:]:
+        if x0 == x1:
+            y0 += y1
+        else:
+            r.append((x0, y0))
+            x0, y0 = x1, y1
+    r.append((x0, y0))
+    return r
+
+
+#### Unit tests
+
+
+class TestKExcel(unittest.TestCase):
+    def test_rich_simplify(self):
+        self.assertEqual(rich_simplify([]), [])
+        self.assertEqual(rich_simplify([("a", "x")]), [("a", "x")])
+        self.assertEqual(rich_simplify([("a", "x"), ("a", "y")]), [("a", "xy")])
+        self.assertEqual(rich_simplify([("a", "x"), ("b", "y")]), [("a", "x"), ("b", "y")])
+
+if __name__ == u'__main__':
+    unittest.main()
