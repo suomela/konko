@@ -2,11 +2,11 @@
 u"""Generating safe, printable string."""
 
 import re
+import string
 import unicodedata
 import unittest
 
 
-_space = re.compile(ur'\s+')
 _unsafe = re.compile(ur'[^a-z0-9]+')
 
 
@@ -19,8 +19,18 @@ def stringify(s):
         return u' '.join(s)
 
 
+def _isprintable(s):
+    if s == '':
+        return s
+    a = min(s)
+    b = max(s)
+    return a >= ' ' and b <= '~'
+
+
 def printable(s):
     s = stringify(s)
+    if _isprintable(s):
+        return s
     r = u''
     for c in s:
         if c.isspace():
@@ -32,6 +42,8 @@ def printable(s):
 
 def printable_nl(s):
     s = stringify(s)
+    if _isprintable(s):
+        return s
     r = u''
     for c in s:
         if c == u'\n':
@@ -43,14 +55,14 @@ def printable_nl(s):
     return r
 
 
-    if s.isprintable():
-        return s
-    return u''.join(c if c.isprintable() or c == u'\n' else u' ' for c in s if c.isprintable() or c.isspace())
-
 
 def printable_compact(s):
     s = printable(s)
-    return _space.sub(u' ', s)
+    while True:
+        x = s.replace(u'  ', u' ')
+        if x == s:
+            return x
+        s = x
 
 
 def safe(s):
