@@ -355,6 +355,7 @@ class Search():
             ("After",),
             ("Simple",),
             ("Lemma",),
+            ("Link",),
             ("Source",),
             ("File",),
             ("Sample",),
@@ -371,7 +372,8 @@ class Search():
         self.xs.write_rich(word.after)
         self.xs.write_string(word.lemma)
         self.xs.write_string(word.lemma)
-        self.xs.write_url(word.link(f), f.source.key)
+        self.xs.write_url(word.link(f), "text")
+        self.xs.write_string(f.source.key)
         self.xs.write_string(f.shortname)
         self.xs.write_string(word.sample.name)
         self.xs.write_number(word.line)
@@ -417,8 +419,8 @@ class Conc():
         self.log_file = sys.stderr
 
     def get_columns(self, what):
-        num = 6
         cols = []
+        cols.append(("Link",))
         cols.append(("Source",))
         cols.append(("File",))
         if what == "samples":
@@ -439,7 +441,8 @@ class Conc():
             xs = self.xsf
         else:
             xs = self.xss
-        xs.write_url(f.url, f.source.key)
+        xs.write_url(f.url, "text")
+        xs.write_string(f.source.key)
         xs.write_string(f.shortname)
         if sample is not None:
             xs.write_string(sample.name)
