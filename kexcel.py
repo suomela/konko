@@ -1,18 +1,19 @@
-"""Generating Excel files."""
+u"""Generating Excel files."""
 
+from __future__ import absolute_import
 import collections
 import xlsxwriter
 import kstyle
 import kutil
 
 
-class Excel:
+class Excel(object):
     def __init__(self, filename):
         try:
             self.wb = xlsxwriter.Workbook(filename)
         except:
-            kutil.exception_exit('error creating output file: {}'.format(filename))
-        self.fmt = { k: self.wb.add_format(v) for k, v in kstyle.excel_format.items() }
+            kutil.exception_exit(u'error creating output file: {}'.format(filename))
+        self.fmt = dict(( k, self.wb.add_format(v)) for k, v in kstyle.excel_format.items())
         self.sheets = []
 
     def sheet(self, name, cols):
@@ -24,7 +25,7 @@ class Excel:
         self.wb.close()
 
 
-class Sheet:
+class Sheet(object):
     def __init__(self, xl, name, cols):
         self.isopen = True
         self.xl = xl
@@ -38,7 +39,7 @@ class Sheet:
     def close(self):
         if not self.isopen:
             return
-        self.ws.set_row(0, None, self.xl.fmt["bold"])
+        self.ws.set_row(0, None, self.xl.fmt[u"bold"])
         self.r = 0
         self.c = 0
         for col in self.cols:
@@ -63,7 +64,7 @@ class Sheet:
     def write_number(self, v):
         if v is not None:
             self.ws.write_number(self.r, self.c, v)
-            self._tell(len(str(v)))
+            self._tell(len(unicode(v)))
         self.c += 1
 
     def write_string(self, v):
@@ -80,9 +81,9 @@ class Sheet:
 
     def write_rich(self, v):
         l = []
-        s = ""
+        s = u""
         for fmt, txt in v:
-            if fmt != "normal":
+            if fmt != u"normal":
                 l.append(self.xl.fmt[fmt])
             l.append(txt)
             s += txt

@@ -1,5 +1,6 @@
-"""Miscellaneous utility functions."""
+u"""Miscellaneous utility functions."""
 
+from __future__ import absolute_import
 import unittest
 import glob
 import os
@@ -9,7 +10,7 @@ import sys
 
 def exception_exit(msg):
     t, v, tb = sys.exc_info()
-    print('{}.{}: {}'.format(t.__module__, t.__name__, v), file=sys.stderr)
+    print >>sys.stderr, u'{}.{}: {}'.format(t.__module__, t.__name__, v)
     sys.exit(msg)
 
 
@@ -18,7 +19,7 @@ def listglob(globs):
     for x in globs:
         g = glob.glob(x)
         if len(g) == 0:
-            sys.exit('pattern does not match any file: {}'.format(x))
+            sys.exit(u'pattern does not match any file: {}'.format(x))
         l += g
     return l
 
@@ -28,14 +29,14 @@ def try_makedirs(path):
         try:
             os.makedirs(path)
         except:
-            exception_exit('error creating directory: {}'.format(path))
+            exception_exit(u'error creating directory: {}'.format(path))
 
 
 def safe_regex(x, flags):
     try:
         return re.compile(x, flags)
     except:
-        exception_exit('error parsing regex: {}'.format(x))
+        exception_exit(u'error parsing regex: {}'.format(x))
 
 
 def try_search(r, w, i):
@@ -66,23 +67,23 @@ def try_capture(r, w):
         return None
     x = []
     if m.lastindex is not None:
-        for i in range(m.lastindex):
+        for i in xrange(m.lastindex):
             g = m.group(i + 1)
-            if g is not None and g != '':
+            if g is not None and g != u'':
                 x.append(g)
     if len(x) == 0:
         x.append(m.group())
     return tuple(x)
 
 
-def try_capture_join(r, w, sep=' '):
+def try_capture_join(r, w, sep=u' '):
     x = try_capture(r, w)
     if x is None:
         return None
     return sep.join(x)
 
 
-class Counter:
+class Counter(object):
     def __init__(self):
         self.distinct = set()
         self.total = 0
@@ -100,69 +101,69 @@ class Counter:
 
 class TestCapture(unittest.TestCase):
     def test_none(self):
-        self.assertEqual(try_capture(None, ' abc'), None)
+        self.assertEqual(try_capture(None, u' abc'), None)
 
     def test_noparen(self):
-        r = re.compile(r'ab*c')
-        self.assertEqual(try_capture(r, ' abc'), None)
-        self.assertEqual(try_capture(r, 'abc '), None)
-        self.assertEqual(try_capture(r, 'abc'), ('abc',))
-        self.assertEqual(try_capture(r, 'abbc'), ('abbc',))
+        r = re.compile(ur'ab*c')
+        self.assertEqual(try_capture(r, u' abc'), None)
+        self.assertEqual(try_capture(r, u'abc '), None)
+        self.assertEqual(try_capture(r, u'abc'), (u'abc',))
+        self.assertEqual(try_capture(r, u'abbc'), (u'abbc',))
 
     def test_paren(self):
-        r1 = re.compile(r'a(b*)c')
-        r2 = re.compile(r'a(b+)?c')
+        r1 = re.compile(ur'a(b*)c')
+        r2 = re.compile(ur'a(b+)?c')
         for r in r1, r2:
-            self.assertEqual(try_capture(r, ' abc'), None)
-            self.assertEqual(try_capture(r, 'abc '), None)
-            self.assertEqual(try_capture(r, 'ac'), ('ac',))
-            self.assertEqual(try_capture(r, 'abc'), ('b',))
-            self.assertEqual(try_capture(r, 'abbc'), ('bb',))
+            self.assertEqual(try_capture(r, u' abc'), None)
+            self.assertEqual(try_capture(r, u'abc '), None)
+            self.assertEqual(try_capture(r, u'ac'), (u'ac',))
+            self.assertEqual(try_capture(r, u'abc'), (u'b',))
+            self.assertEqual(try_capture(r, u'abbc'), (u'bb',))
 
     def test_paren2(self):
-        r1 = re.compile(r'a(b+)?c(d+)?e')
-        r2 = re.compile(r'a(b*)c(d*)e')
+        r1 = re.compile(ur'a(b+)?c(d+)?e')
+        r2 = re.compile(ur'a(b*)c(d*)e')
         for r in r1, r2:
-            self.assertEqual(try_capture(r, ' abcde'), None)
-            self.assertEqual(try_capture(r, 'abcde '), None)
-            self.assertEqual(try_capture(r, 'ace'), ('ace',))
-            self.assertEqual(try_capture(r, 'abce'), ('b',))
-            self.assertEqual(try_capture(r, 'acde'), ('d',))
-            self.assertEqual(try_capture(r, 'abcde'), ('b', 'd'))
-            self.assertEqual(try_capture(r, 'abbcdde'), ('bb', 'dd'))
+            self.assertEqual(try_capture(r, u' abcde'), None)
+            self.assertEqual(try_capture(r, u'abcde '), None)
+            self.assertEqual(try_capture(r, u'ace'), (u'ace',))
+            self.assertEqual(try_capture(r, u'abce'), (u'b',))
+            self.assertEqual(try_capture(r, u'acde'), (u'd',))
+            self.assertEqual(try_capture(r, u'abcde'), (u'b', u'd'))
+            self.assertEqual(try_capture(r, u'abbcdde'), (u'bb', u'dd'))
 
 
 class TestCaptureJoin(unittest.TestCase):
     def test_noparen(self):
-        r = re.compile(r'ab*c')
-        self.assertEqual(try_capture_join(r, ' abc'), None)
-        self.assertEqual(try_capture_join(r, 'abc '), None)
-        self.assertEqual(try_capture_join(r, 'abc'), 'abc')
-        self.assertEqual(try_capture_join(r, 'abbc'), 'abbc')
+        r = re.compile(ur'ab*c')
+        self.assertEqual(try_capture_join(r, u' abc'), None)
+        self.assertEqual(try_capture_join(r, u'abc '), None)
+        self.assertEqual(try_capture_join(r, u'abc'), u'abc')
+        self.assertEqual(try_capture_join(r, u'abbc'), u'abbc')
 
     def test_paren(self):
-        r1 = re.compile(r'a(b*)c')
-        r2 = re.compile(r'a(b+)?c')
+        r1 = re.compile(ur'a(b*)c')
+        r2 = re.compile(ur'a(b+)?c')
         for r in r1, r2:
-            self.assertEqual(try_capture_join(r, ' abc'), None)
-            self.assertEqual(try_capture_join(r, 'abc '), None)
-            self.assertEqual(try_capture_join(r, 'ac'), 'ac')
-            self.assertEqual(try_capture_join(r, 'abc'), 'b')
-            self.assertEqual(try_capture_join(r, 'abbc'), 'bb')
+            self.assertEqual(try_capture_join(r, u' abc'), None)
+            self.assertEqual(try_capture_join(r, u'abc '), None)
+            self.assertEqual(try_capture_join(r, u'ac'), u'ac')
+            self.assertEqual(try_capture_join(r, u'abc'), u'b')
+            self.assertEqual(try_capture_join(r, u'abbc'), u'bb')
 
     def test_paren2(self):
-        r1 = re.compile(r'a(b+)?c(d+)?e')
-        r2 = re.compile(r'a(b*)c(d*)e')
+        r1 = re.compile(ur'a(b+)?c(d+)?e')
+        r2 = re.compile(ur'a(b*)c(d*)e')
         for r in r1, r2:
-            self.assertEqual(try_capture_join(r, ' abcde'), None)
-            self.assertEqual(try_capture_join(r, 'abcde '), None)
-            self.assertEqual(try_capture_join(r, 'ace'), 'ace')
-            self.assertEqual(try_capture_join(r, 'abce'), 'b')
-            self.assertEqual(try_capture_join(r, 'acde'), 'd')
-            self.assertEqual(try_capture_join(r, 'abcde'), 'b d')
-            self.assertEqual(try_capture_join(r, 'abbcdde'), 'bb dd')
-            self.assertEqual(try_capture_join(r, 'abbcdde', 'x'), 'bbxdd')
+            self.assertEqual(try_capture_join(r, u' abcde'), None)
+            self.assertEqual(try_capture_join(r, u'abcde '), None)
+            self.assertEqual(try_capture_join(r, u'ace'), u'ace')
+            self.assertEqual(try_capture_join(r, u'abce'), u'b')
+            self.assertEqual(try_capture_join(r, u'acde'), u'd')
+            self.assertEqual(try_capture_join(r, u'abcde'), u'b d')
+            self.assertEqual(try_capture_join(r, u'abbcdde'), u'bb dd')
+            self.assertEqual(try_capture_join(r, u'abbcdde', u'x'), u'bbxdd')
 
 
-if __name__ == '__main__':
+if __name__ == u'__main__':
     unittest.main()

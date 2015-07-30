@@ -1,15 +1,15 @@
-"""How to format Konko output."""
+u"""How to format Konko output."""
 
 excel_format = {
-    "bold":  {'bold': True},
-    "hl":    {'bold': True, 'font_color': '#dd0000'},
-    "key":   {'align': 'center', 'bold': True},
-    "right": {'align': 'right'},
-    "light": {'font_color': '#999999'},
+    u"bold":  {u'bold': True},
+    u"hl":    {u'bold': True, u'font_color': u'#dd0000'},
+    u"key":   {u'align': u'center', u'bold': True},
+    u"right": {u'align': u'right'},
+    u"light": {u'font_color': u'#999999'},
 }
 
 
-css = """
+css = u"""
 .sep, .tag, .del {
     color: #999;
 }

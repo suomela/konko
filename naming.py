@@ -1,18 +1,19 @@
-"""Generating unique, printable names."""
+u"""Generating unique, printable names."""
 
+from __future__ import absolute_import
 import unittest
 import filtering
 
 
 def number_printable(s, i):
-    return '{} ({})'.format(s, i)
+    return u'{} ({})'.format(s, i)
 
 
 def number_safe(s, i):
-    return '{}-{}'.format(s, i)
+    return u'{}-{}'.format(s, i)
 
 
-class UniqueNames:
+class UniqueNames(object):
     def __init__(self, normalising, numbering):
         self.normalising = normalising
         self.numbering = numbering
@@ -50,46 +51,46 @@ def safe_naming():
 class TestUniqueNames(unittest.TestCase):
     def test_printable(self):
         u = printable_naming()
-        for i in range(3):
-            self.assertEqual(u.get('abc'), 'abc')
-            self.assertEqual(u.get('123\n456'), '123 456')
-            self.assertEqual(u.get('abc\b'), 'abc (1)')
-            self.assertEqual(u.get('a\bbc'), 'abc (2)')
-            self.assertEqual(u.get('abc\n'), 'abc ')
-            self.assertEqual(u.get('abc\r'), 'abc  (1)')
-            self.assertEqual(u.get('abc\t'), 'abc  (2)')
-            self.assertEqual(u.get('äbc'), 'äbc')
-            self.assertEqual(u.get(('abc',)), 'abc (3)')
-            self.assertEqual(u.get('123 456'), '123 456 (1)')
-            self.assertEqual(u.get('123\t456'), '123 456 (2)')
-            self.assertEqual(u.get(('123', '456')), '123 456 (3)')
-            self.assertEqual(u.get(''), '')
-            self.assertEqual(u.get('\b'), ' (1)')
-            self.assertEqual(u.get('\0'), ' (2)')
-            self.assertEqual(u.get(None), ' (3)')
-            self.assertEqual(u.get(()), ' (4)')
+        for i in xrange(3):
+            self.assertEqual(u.get(u'abc'), u'abc')
+            self.assertEqual(u.get(u'123\n456'), u'123 456')
+            self.assertEqual(u.get(u'abc\b'), u'abc (1)')
+            self.assertEqual(u.get(u'a\bbc'), u'abc (2)')
+            self.assertEqual(u.get(u'abc\n'), u'abc ')
+            self.assertEqual(u.get(u'abc\r'), u'abc  (1)')
+            self.assertEqual(u.get(u'abc\t'), u'abc  (2)')
+            self.assertEqual(u.get(u'äbc'), u'äbc')
+            self.assertEqual(u.get((u'abc',)), u'abc (3)')
+            self.assertEqual(u.get(u'123 456'), u'123 456 (1)')
+            self.assertEqual(u.get(u'123\t456'), u'123 456 (2)')
+            self.assertEqual(u.get((u'123', u'456')), u'123 456 (3)')
+            self.assertEqual(u.get(u''), u'')
+            self.assertEqual(u.get(u'\b'), u' (1)')
+            self.assertEqual(u.get(u'\0'), u' (2)')
+            self.assertEqual(u.get(None), u' (3)')
+            self.assertEqual(u.get(()), u' (4)')
 
     def test_safe(self):
         u = safe_naming()
-        for i in range(3):
-            self.assertEqual(u.get('abc'), 'abc')
-            self.assertEqual(u.get('123\n456'), '123-456')
-            self.assertEqual(u.get('abc\b'), 'abc-1')
-            self.assertEqual(u.get('a\bbc'), 'a-bc')
-            self.assertEqual(u.get('abc\n'), 'abc-2')
-            self.assertEqual(u.get('abc\r'), 'abc-3')
-            self.assertEqual(u.get('abc\t'), 'abc-4')
-            self.assertEqual(u.get('äbc'), 'abc-5')
-            self.assertEqual(u.get(('abc',)), 'abc-6')
-            self.assertEqual(u.get('123 456'), '123-456-1')
-            self.assertEqual(u.get('123\t456'), '123-456-2')
-            self.assertEqual(u.get(('123', '456')), '123-456-3')
-            self.assertEqual(u.get(''), '-')
-            self.assertEqual(u.get('\b'), '--1')
-            self.assertEqual(u.get('\0'), '--2')
-            self.assertEqual(u.get(None), '--3')
-            self.assertEqual(u.get(()), '--4')
+        for i in xrange(3):
+            self.assertEqual(u.get(u'abc'), u'abc')
+            self.assertEqual(u.get(u'123\n456'), u'123-456')
+            self.assertEqual(u.get(u'abc\b'), u'abc-1')
+            self.assertEqual(u.get(u'a\bbc'), u'a-bc')
+            self.assertEqual(u.get(u'abc\n'), u'abc-2')
+            self.assertEqual(u.get(u'abc\r'), u'abc-3')
+            self.assertEqual(u.get(u'abc\t'), u'abc-4')
+            self.assertEqual(u.get(u'äbc'), u'abc-5')
+            self.assertEqual(u.get((u'abc',)), u'abc-6')
+            self.assertEqual(u.get(u'123 456'), u'123-456-1')
+            self.assertEqual(u.get(u'123\t456'), u'123-456-2')
+            self.assertEqual(u.get((u'123', u'456')), u'123-456-3')
+            self.assertEqual(u.get(u''), u'-')
+            self.assertEqual(u.get(u'\b'), u'--1')
+            self.assertEqual(u.get(u'\0'), u'--2')
+            self.assertEqual(u.get(None), u'--3')
+            self.assertEqual(u.get(()), u'--4')
 
 
-if __name__ == '__main__':
+if __name__ == u'__main__':
     unittest.main()

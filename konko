@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import with_statement
+from __future__ import absolute_import
 import os
 import sys
 import lxml.html
@@ -12,6 +14,7 @@ import kconfig
 import kexcel
 import kstyle
 import kutil
+from io import open
 
 
 REPORT = 10000
@@ -22,15 +25,15 @@ def write(s):
     sys.stdout.flush()
 
 
-class Token:
+class Token(object):
     def html(self):
         i = self.html_id()
         k = self.html_class()
         attr = {}
         if len(k) > 0:
-            attr["class"] = " ".join(k)
+            attr[u"class"] = u" ".join(k)
         if i is not None:
-            attr["id"] = i
+            attr[u"id"] = i
         if len(attr) > 0:
             return E.span(self.longtext, **attr)
         else:
@@ -48,20 +51,20 @@ class Word(Token):
             return None
         if len(self.match) == 0:
             return None
-        return "l{}c{}".format(self.line, self.char)
+        return u"l{}c{}".format(self.line, self.char)
 
     def html_class(self):
         k = []
         if self.delete:
-            k.append("del")
+            k.append(u"del")
         elif len(self.match) > 0:
-            k.append("match")
+            k.append(u"match")
         return k
 
     def link(self, text):
         i = self.html_id()
         assert i is not None
-        return '{}#{}'.format(text.url, i)
+        return u'{}#{}'.format(text.url, i)
 
     def process(self, conc):
         self.lemma = self.simpletext.lower()
@@ -100,13 +103,13 @@ class Word(Token):
             if not t.delete and isinstance(t, Word):
                 ctx.append(t.simpletext.lower())
             j += d
-        return ' '.join(ctx)
+        return u' '.join(ctx)
 
     def for_context(self):
         if len(self.match) > 0:
-            return "hl", self.simpletext
+            return u"hl", self.simpletext
         else:
-            return "normal", self.simpletext
+            return u"normal", self.simpletext
 
 
 class Tag(Token):
@@ -114,15 +117,15 @@ class Tag(Token):
         return None
 
     def html_class(self):
-        k = ["tag"]
+        k = [u"tag"]
         if self.delete:
-            k.append("del")
+            k.append(u"del")
         if self.samplekey is not None:
-            k.append("sample")
+            k.append(u"sample")
         return k
 
     def descr(self):
-        return 'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
+        return u'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
 
     def process(self, conc):
         self.textkey = kutil.try_capture(conc.config.text, self.raw)
@@ -140,7 +143,7 @@ class Tag(Token):
                 self.delete_close.append(i)
 
     def for_context(self):
-        return "light", self.simpletext
+        return u"light", self.simpletext
 
 
 class Sep(Token):
@@ -148,16 +151,16 @@ class Sep(Token):
         return None
 
     def html_class(self):
-        return ["sep"]
+        return [u"sep"]
 
     def process(self, conc):
         pass
 
     def for_context(self):
-        return "normal", self.simpletext
+        return u"normal", self.simpletext
 
 
-class Sample:
+class Sample(object):
     def __init__(self, text, key):
         assert isinstance(key, tuple)
         self.text = text
@@ -168,7 +171,7 @@ class Sample:
         self.name = self.text.samplenames.get(self.key)
 
 
-class Text:
+class Text(object):
     def __init__(self, file, key):
         assert isinstance(key, tuple)
         self.file = file
@@ -176,8 +179,8 @@ class Text:
         self.key = key
         fullkey = (file.shortname,) + key
         self.safename = file.source.safenames.get(fullkey)
-        self.htmlfile = self.safename + ".html"
-        self.url = file.source.url + '/' + self.htmlfile
+        self.htmlfile = self.safename + u".html"
+        self.url = file.source.url + u'/' + self.htmlfile
         self.htmlpath = os.path.join(file.source.htmlpath, self.htmlfile)
         self.samplenames = naming.printable_naming()
         self.samplemap = {}
@@ -186,8 +189,8 @@ class Text:
     def set_name(self):
         self.name = self.file.textnames.get(self.key)
         self.fullname = self.file.shortname
-        if self.name != '':
-            self.fullname += ": " + self.name
+        if self.name != u'':
+            self.fullname += u": " + self.name
 
     def process(self):
         self.clean()
@@ -195,24 +198,24 @@ class Text:
 
     def write(self):
         doc = self.get_html()
-        with open(self.htmlpath, "bw") as f:
-            f.write(b'<!DOCTYPE html>\n')
+        with open(self.htmlpath, u"bw") as f:
+            f.write('<!DOCTYPE html>\n')
             f.write(lxml.html.tostring(doc))
-            f.write(b'\n')
+            f.write('\n')
 
     def get_html(self):
         content = [t.html() for t in self.tokens]
         head = E.head(
             E.title(self.fullname),
-            E.meta(charset="UTF-8"),
+            E.meta(charset=u"UTF-8"),
             E.style(kstyle.css),
         )
         body = E.body(E.pre(*content))
-        return E.html(head, body, lang="en")
+        return E.html(head, body, lang=u"en")
 
     def clean(self):
         m = len(self.conc.config.delete_pair)
-        stack = [ [] for x in range(m) ]
+        stack = [ [] for x in xrange(m) ]
         delete_range = []
         for j,t in enumerate(self.tokens):
             if isinstance(t, Tag):
@@ -220,16 +223,16 @@ class Text:
                     stack[x].append(j)
                 for x in t.delete_close:
                     if len(stack[x]) == 0:
-                        self.conc.warn(self.file.filename, "{}: no matching opening tag".format(t.descr()))
+                        self.conc.warn(self.file.filename, u"{}: no matching opening tag".format(t.descr()))
                     else:
                         i = stack[x].pop()
                         delete_range.append((i,j))
         for l in stack:
             for i in l:
                 t = self.tokens[i]
-                self.conc.warn(self.file.filename, "{}: no matching closing tag".format(t.descr()))
+                self.conc.warn(self.file.filename, u"{}: no matching closing tag".format(t.descr()))
         for i,j in delete_range:
-            for k in range(i,j+1):
+            for k in xrange(i,j+1):
                 self.tokens[k].delete = True
         self.words = []
         samplekey = ()
@@ -260,16 +263,16 @@ class Text:
             self.report2(sample.words, sample)
 
     def report2(self, words, sample=None):
-        counts = { s.key: kutil.Counter() for s in self.conc.search }
+        counts = dict(( s.key, kutil.Counter()) for s in self.conc.search)
         for w in words:
             for search in w.match:
                 counts[search.key].add(w.lemma)
         self.conc.add(self, sample, len(words), counts)
 
 
-class File:
+class File(object):
     def __init__(self, source, filename, shortname):
-        assert isinstance(shortname, str)
+        assert isinstance(shortname, unicode)
         self.source = source
         self.conc = source.conc
         self.filename = filename
@@ -326,13 +329,13 @@ class File:
         t.process(self.conc)
         self.tokens.append(t)
         for c in raw:
-            if c == '\n':
+            if c == u'\n':
                 self.line += 1
                 self.char = 1
             else:
                 self.char += 1
         if len(self.tokens) % REPORT == 0:
-            write('-')
+            write(u'-')
 
     def split(self):
         text = None
@@ -355,7 +358,7 @@ class File:
             return text
 
 
-class Source:
+class Source(object):
     def __init__(self, conc, key, globs):
         self.conc = conc
         self.key = key
@@ -364,39 +367,39 @@ class Source:
         self.safenames = naming.safe_naming()
 
     def process(self):
-        self.url = self.conc.url + '/' + self.safename
+        self.url = self.conc.url + u'/' + self.safename
         self.htmlpath = os.path.join(self.conc.config.output_dir, self.safename)
         kutil.try_makedirs(self.htmlpath)
-        write(self.key + ' ')
+        write(self.key + u' ')
         skip = set(kutil.listglob(self.conc.config.skip_files))
         l = kutil.listglob(self.globs)
         l = [x for x in l if x not in skip]
         if len(l) == 0:
-            sys.exit("{}: after skipping, there are no files left".format(self.key))
+            sys.exit(u"{}: after skipping, there are no files left".format(self.key))
         shortnames = pathabbr.pathabbr(l)
         self.files = []
         for filename in l:
-            write(':')
+            write(u':')
             f = File(self, filename, shortnames[filename])
             self.files.append(f)
             try:
                 f.read()
             except:
-                write('\n')
-                kutil.exception_exit('error reading input file: {}'.format(filename))
+                write(u'\n')
+                kutil.exception_exit(u'error reading input file: {}'.format(filename))
             f.process()
             for t in f.texts:
-                write('.')
+                write(u'.')
                 t.process()
                 try:
                     t.write()
                 except:
-                    write('\n')
-                    kutil.exception_exit('error writing output file: {}'.format(t.htmlfile))
-        write('\n')
+                    write(u'\n')
+                    kutil.exception_exit(u'error writing output file: {}'.format(t.htmlfile))
+        write(u'\n')
 
 
-class Search():
+class Search(object):
     def __init__(self, conc, key, re):
         self.key = key
         self.re = re
@@ -404,21 +407,21 @@ class Search():
 
     def get_columns(self):
         return [
-            ("N",),
-            ("Before", "right"),
-            ("Word", "key"),
-            ("After",),
-            ("Simple",),
-            ("Lemma",),
-            ("Link",),
-            ("Source",),
-            ("File",),
-            ("Text",),
-            ("Sample",),
-            ("Line",),
-            ("Column",),
-            ("Left", "light", 10),
-            ("Right", "light", 10),
+            (u"N",),
+            (u"Before", u"right"),
+            (u"Word", u"key"),
+            (u"After",),
+            (u"Simple",),
+            (u"Lemma",),
+            (u"Link",),
+            (u"Source",),
+            (u"File",),
+            (u"Text",),
+            (u"Sample",),
+            (u"Line",),
+            (u"Column",),
+            (u"Left", u"light", 10),
+            (u"Right", u"light", 10),
         ]
 
     def add(self, word, text):
@@ -428,7 +431,7 @@ class Search():
         self.xs.write_rich(word.after)
         self.xs.write_string(word.lemma)
         self.xs.write_string(word.lemma)
-        self.xs.write_url(word.link(text), "text")
+        self.xs.write_url(word.link(text), u"text")
         self.xs.write_string(text.file.source.key)
         self.xs.write_string(text.file.shortname)
         self.xs.write_string(text.name)
@@ -440,16 +443,16 @@ class Search():
         self.xs.next_row()
 
     def xl_open(self):
-        xlsx = self.key + ".xlsx"
+        xlsx = self.key + u".xlsx"
         filename = os.path.join(self.conc.config.output_dir, xlsx)
         self.xl = kexcel.Excel(filename)
-        self.xs = self.xl.sheet("Concordance", self.get_columns())
+        self.xs = self.xl.sheet(u"Concordance", self.get_columns())
 
     def xl_close(self):
         self.xl.close()
 
 
-class Conc():
+class Conc(object):
     def __init__(self, config_file):
         self.log_file = sys.stderr
         self.safenames = naming.safe_naming()
@@ -458,19 +461,19 @@ class Conc():
         self.search = [Search(self, key, re) for key, re in self.config.search]
 
     def warn(self, filename, msg):
-        write('!')
+        write(u'!')
         self.log(filename, msg)
 
     def log(self, filename, msg):
-        self.log_file.write('{}: {}\n'.format(filename, msg))
+        self.log_file.write(u'{}: {}\n'.format(filename, msg))
         self.log_file.flush()
 
     def log_open(self):
-        filename = os.path.join(self.config.output_dir, "log.txt")
+        filename = os.path.join(self.config.output_dir, u"log.txt")
         try:
-            self.log_file = open(filename, "w")
+            self.log_file = open(filename, u"w")
         except:
-            kutil.exception_exit('error creating log file: {}'.format(filename))
+            kutil.exception_exit(u'error creating log file: {}'.format(filename))
 
     def log_close(self):
         self.log_file.close()
@@ -478,21 +481,21 @@ class Conc():
 
     def get_columns(self, what):
         cols = []
-        cols.append(("Link",))
-        cols.append(("Source",))
-        cols.append(("File",))
-        cols.append(("Text",))
-        if what == "samples":
-            cols.append(("Sample",))
-        elif what == "files":
+        cols.append((u"Link",))
+        cols.append((u"Source",))
+        cols.append((u"File",))
+        cols.append((u"Text",))
+        if what == u"samples":
+            cols.append((u"Sample",))
+        elif what == u"files":
             pass
         else:
             assert False, what
-        cols.append(("Words",))
+        cols.append((u"Words",))
         for s in self.search:
-            cols.append(("{} tokens".format(s.key),))
+            cols.append((u"{} tokens".format(s.key),))
         for s in self.search:
-            cols.append(("{} types".format(s.key),))
+            cols.append((u"{} types".format(s.key),))
         return cols
 
     def add(self, text, sample, words, counts):
@@ -500,7 +503,7 @@ class Conc():
             xs = self.xsf
         else:
             xs = self.xss
-        xs.write_url(text.url, "text")
+        xs.write_url(text.url, u"text")
         xs.write_string(text.file.source.key)
         xs.write_string(text.file.shortname)
         xs.write_string(text.name)
@@ -514,17 +517,17 @@ class Conc():
         xs.next_row()
 
     def xl_open(self):
-        xlsx = "summary.xlsx"
+        xlsx = u"summary.xlsx"
         filename = os.path.join(self.config.output_dir, xlsx)
         self.xl = kexcel.Excel(filename)
-        self.xsf = self.xl.sheet("Files", self.get_columns("files"))
-        self.xss = self.xl.sheet("Samples", self.get_columns("samples"))
+        self.xsf = self.xl.sheet(u"Files", self.get_columns(u"files"))
+        self.xss = self.xl.sheet(u"Samples", self.get_columns(u"samples"))
 
     def xl_close(self):
         self.xl.close()
 
     def do(self):
-        self.url = 'http://localhost:{}'.format(self.config.server_port)
+        self.url = u'http://localhost:{}'.format(self.config.server_port)
         kutil.try_makedirs(self.config.output_dir)
         self.log_open()
         self.xl_open()
@@ -541,7 +544,7 @@ class Conc():
 def main():
     param = sys.argv[1:]
     if len(param) != 1:
-        sys.exit('usage: {} CONFIGURATION'.format(sys.argv[0]))
+        sys.exit(u'usage: {} CONFIGURATION'.format(sys.argv[0]))
     config_file, = param
     conc = Conc(config_file)
     conc.do()

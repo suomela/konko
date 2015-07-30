@@ -1,12 +1,15 @@
-"""Reading Konko configuration file."""
+u"""Reading Konko configuration file."""
 
+from __future__ import with_statement
+from __future__ import absolute_import
 import json
 import re
 import sys
 import kutil
+from io import open
 
 
-class KConfig:
+class KConfig(object):
     def __init__(self, file):
         self.file = file
         self.search_flags = 0
@@ -20,9 +23,9 @@ class KConfig:
         self.text = None
         self.sample = None
         self.tag = None
-        self.word = re.compile(r"\w+([-']\w+)*")
-        self.output_dir = 'output'
-        self.encoding = 'ascii'
+        self.word = re.compile(ur"\w+([-']\w+)*")
+        self.output_dir = u'output'
+        self.encoding = u'ascii'
         self.context = 100
         self.server_port = 8000
         with open(file) as f:
@@ -31,20 +34,20 @@ class KConfig:
 
     def error(self, path, msg):
         if len(path) == 0:
-            elem = 'root element'
+            elem = u'root element'
         else:
-            elem = 'element {}'.format('.'.join([str(x) for x in path]))
-        sys.exit('{}: {}: {}'.format(
+            elem = u'element {}'.format(u'.'.join([unicode(x) for x in path]))
+        sys.exit(u'{}: {}: {}'.format(
             self.file, elem, msg
         ))
 
     def type_error(self, path, exp, got):
-        self.error(path, 'expected {}, got {}'.format(
+        self.error(path, u'expected {}, got {}'.format(
             exp.__name__, type(got).__name__
         ))
 
     def key_error(self, path, key):
-        self.error(path, 'unsupported key "{}"'.format(key))
+        self.error(path, u'unsupported key "{}"'.format(key))
 
     def get(self, path):
         p = []
@@ -74,57 +77,57 @@ class KConfig:
         self.expect(path, list, got)
         for i, v in enumerate(got):
             p = path + [i]
-            self.expect(p, str, v)
+            self.expect(p, unicode, v)
 
     def set_config(self, path0, val0):
         self.expect(path0, dict, val0)
         for key, v in val0.items():
             p = path0 + [key]
-            if key == 'search-ignore-case':
+            if key == u'search-ignore-case':
                 self.expect(p, bool, v)
                 self.search_flags = re.IGNORECASE if v else 0
-            elif key == 'tag-ignore-case':
+            elif key == u'tag-ignore-case':
                 self.expect(p, bool, v)
                 self.tag_flags = re.IGNORECASE if v else 0
-            elif key == 'word-ignore-case':
+            elif key == u'word-ignore-case':
                 self.expect(p, bool, v)
                 self.word_flags = re.IGNORECASE if v else 0
         for key, v in val0.items():
             p = path0 + [key]
-            if key in ('search-ignore-case', 'tag-ignore-case', 'word-ignore-case'):
+            if key in (u'search-ignore-case', u'tag-ignore-case', u'word-ignore-case'):
                 pass
-            elif key == 'source':
+            elif key == u'source':
                 self.set_source(p, v)
-            elif key == 'output-dir':
-                self.expect(p, str, v)
+            elif key == u'output-dir':
+                self.expect(p, unicode, v)
                 self.output_dir = v
-            elif key == 'encoding':
-                self.expect(p, str, v)
+            elif key == u'encoding':
+                self.expect(p, unicode, v)
                 self.encoding = v
-            elif key == 'context':
+            elif key == u'context':
                 self.expect(p, int, v)
                 self.context = v
-            elif key == 'server-port':
+            elif key == u'server-port':
                 self.expect(p, int, v)
                 self.server_port = v
-            elif key == 'search':
+            elif key == u'search':
                 self.set_search(p, v)
-            elif key == 'skip-files':
+            elif key == u'skip-files':
                 self.expect_string_list(p, v)
                 self.skip_files += v
-            elif key == 'delete':
+            elif key == u'delete':
                 self.set_delete(p, v)
-            elif key == 'text':
-                self.expect(p, str, v)
+            elif key == u'text':
+                self.expect(p, unicode, v)
                 self.text = kutil.safe_regex(v, self.tag_flags)
-            elif key == 'sample':
-                self.expect(p, str, v)
+            elif key == u'sample':
+                self.expect(p, unicode, v)
                 self.sample = kutil.safe_regex(v, self.tag_flags)
-            elif key == 'tag':
-                self.expect(p, str, v)
+            elif key == u'tag':
+                self.expect(p, unicode, v)
                 self.tag = kutil.safe_regex(v, self.tag_flags)
-            elif key == 'word':
-                self.expect(p, str, v)
+            elif key == u'word':
+                self.expect(p, unicode, v)
                 self.word = kutil.safe_regex(v, self.word_flags)
             else:
                 self.key_error(path0, key)
@@ -140,7 +143,7 @@ class KConfig:
         self.expect(path, dict, v)
         for key, val in sorted(v.items()):
             p = path + [key]
-            self.expect(p, str, val)
+            self.expect(p, unicode, val)
             re = kutil.safe_regex(val, self.search_flags)
             self.search.append((key, re))
 
@@ -158,4 +161,4 @@ class KConfig:
         elif len(l) == 2:
             self.delete_pair.append(l)
         else:
-            self.error(path, 'expected 1 or 2 elements')
+            self.error(path, u'expected 1 or 2 elements')
