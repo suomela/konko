@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import collections
 import os
 import sys
 import lxml.html
@@ -63,9 +62,9 @@ class Word(Token):
             if kutil.exact_match(search.re, self.raw):
                 self.match.append(search)
 
-    def set_context(self, f, i, samplekey):
+    def set_context(self, f, i, sample):
         assert f.tokens[i] == self
-        self.samplekey = samplekey
+        self.sample = sample
         self.before = reversed(self.get_context(f, i, -1))
         self.after = self.get_context(f, i, +1)
         self.left = self.get_context_simple(f, i, -1)
@@ -149,6 +148,16 @@ class Sep(Token):
         return "normal", self.simpletext
 
 
+class Sample:
+    def __init__(self, file, key):
+        self.file = file
+        self.key = key
+        self.words = []
+
+    def set_name(self):
+        self.name = self.file.samplenames.get(self.key)
+
+
 class File:
     def __init__(self, source, filename, shortname):
         self.source = source
@@ -160,6 +169,7 @@ class File:
         self.url = source.url + '/' + self.htmlfile
         self.htmlpath = os.path.join(source.htmlpath, self.htmlfile)
         self.samplenames = naming.printable_naming()
+        self.samples = {}
 
     def read(self):
         with open(self.filename, encoding=self.conc.config.encoding) as f:
@@ -255,24 +265,39 @@ class File:
             for k in range(i,j+1):
                 self.tokens[k].delete = True
         self.words = []
-        self.samples = collections.defaultdict(list)
         samplekey = None
         for i,t in enumerate(self.tokens):
             if isinstance(t, Tag) and not t.delete and t.samplekey is not None:
                 samplekey = t.samplekey
             if isinstance(t, Word) and not t.delete:
-                self.words.append(t)
-                self.samples[samplekey].append(t)
+                sample = self.get_sample(samplekey)
                 if len(t.match) > 0:
-                    t.set_context(self, i, samplekey)
+                    t.set_context(self, i, sample)
+                self.words.append(t)
+                sample.words.append(t)
+
+    def get_sample(self, samplekey):
+        if samplekey not in self.samples:
+            self.samples[samplekey] = Sample(self, samplekey)
+        return self.samples[samplekey]
 
     def report(self):
-        counts = { s.key: kutil.Counter() for s in self.conc.search }
+        self.samplelist = [self.samples[x] for x in sorted(self.samples.keys())]
+        for sample in self.samplelist:
+            sample.set_name()
         for w in self.words:
             for search in w.match:
-                counts[search.key].add(w.lemma)
                 search.add(w, self)
-        self.conc.add(self, len(self.words), counts)
+        self.report2(self.words)
+        for sample in self.samplelist:
+            self.report2(sample.words, sample)
+
+    def report2(self, words, sample=None):
+        counts = { s.key: kutil.Counter() for s in self.conc.search }
+        for w in words:
+            for search in w.match:
+                counts[search.key].add(w.lemma)
+        self.conc.add(self, sample, len(words), counts)
 
 
 class Source:
@@ -348,7 +373,7 @@ class Search():
         self.xs.write_string(word.lemma)
         self.xs.write_url(word.link(f), f.source.key)
         self.xs.write_string(f.shortname)
-        self.xs.write_string(f.samplenames.get(word.samplekey))
+        self.xs.write_string(word.sample.name)
         self.xs.write_number(word.line)
         self.xs.write_number(word.char)
         self.xs.write_string(word.left)
@@ -391,34 +416,46 @@ class Conc():
         self.log_file.close()
         self.log_file = sys.stderr
 
-    def get_columns(self):
+    def get_columns(self, what):
         num = 6
-        cols = [
-            ("Source",),
-            ("File",),
-            ("Words",),
-        ]
+        cols = []
+        cols.append(("Source",))
+        cols.append(("File",))
+        if what == "samples":
+            cols.append(("Sample",))
+        elif what == "files":
+            pass
+        else:
+            assert False, what
+        cols.append(("Words",))
         for s in self.search:
             cols.append(("{} tokens".format(s.key),))
         for s in self.search:
             cols.append(("{} types".format(s.key),))
         return cols
 
-    def add(self, f, words, counts):
-        self.xs.write_url(f.url, f.source.key)
-        self.xs.write_string(f.shortname)
-        self.xs.write_number(words)
+    def add(self, f, sample, words, counts):
+        if sample is None:
+            xs = self.xsf
+        else:
+            xs = self.xss
+        xs.write_url(f.url, f.source.key)
+        xs.write_string(f.shortname)
+        if sample is not None:
+            xs.write_string(sample.name)
+        xs.write_number(words)
         for s in self.search:
-            self.xs.write_number(counts[s.key].total)
+            xs.write_number(counts[s.key].total)
         for s in self.search:
-            self.xs.write_number(counts[s.key].types())
-        self.xs.next_row()
+            xs.write_number(counts[s.key].types())
+        xs.next_row()
 
     def xl_open(self):
         xlsx = "summary.xlsx"
         filename = os.path.join(self.config.output_dir, xlsx)
         self.xl = kexcel.Excel(filename)
-        self.xs = self.xl.sheet("Files", self.get_columns())
+        self.xsf = self.xl.sheet("Files", self.get_columns("files"))
+        self.xss = self.xl.sheet("Samples", self.get_columns("samples"))
 
     def xl_close(self):
         self.xl.close()
