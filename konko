@@ -24,13 +24,13 @@ class Token:
         if i is not None:
             attr["id"] = i
         if len(attr) > 0:
-            return E.span(self.text, **attr)
+            return E.span(self.longtext, **attr)
         else:
-            return self.text
+            return self.longtext
 
     def process0(self):
         self.delete = False
-        self.text = filtering.printable_nl(self.raw)
+        self.longtext = filtering.printable_nl(self.raw)
         self.simpletext = filtering.printable_compact(self.raw)
 
 
@@ -50,10 +50,10 @@ class Word(Token):
             k.append("match")
         return k
 
-    def link(self, f):
+    def link(self, text):
         i = self.html_id()
         assert i is not None
-        return '{}#{}'.format(f.url, i)
+        return '{}#{}'.format(text.url, i)
 
     def process(self, conc):
         self.lemma = self.simpletext.lower()
@@ -62,20 +62,20 @@ class Word(Token):
             if kutil.exact_match(search.re, self.raw):
                 self.match.append(search)
 
-    def set_context(self, f, i, sample):
-        assert f.tokens[i] == self
+    def set_context(self, text, i, sample):
+        assert text.tokens[i] == self
         self.sample = sample
-        self.before = reversed(self.get_context(f, i, -1))
-        self.after = self.get_context(f, i, +1)
-        self.left = self.get_context_simple(f, i, -1)
-        self.right = self.get_context_simple(f, i, +1)
+        self.before = reversed(self.get_context(text, i, -1))
+        self.after = self.get_context(text, i, +1)
+        self.left = self.get_context_simple(text, i, -1)
+        self.right = self.get_context_simple(text, i, +1)
 
-    def get_context(self, f, i, d):
+    def get_context(self, text, i, d):
         ctx = []
         j = i + d
         l = 0
-        while 0 <= j < len(f.tokens) and l < f.conc.config.context:
-            t = f.tokens[j]
+        while 0 <= j < len(text.tokens) and l < text.conc.config.context:
+            t = text.tokens[j]
             if not t.delete:
                 fmt, txt = t.for_context()
                 l += len(txt)
@@ -83,12 +83,12 @@ class Word(Token):
             j += d
         return ctx
 
-    def get_context_simple(self, f, i, d):
+    def get_context_simple(self, text, i, d):
         CTX_WORDS = 4
         ctx = []
         j = i + d
-        while 0 <= j < len(f.tokens) and len(ctx) < CTX_WORDS:
-            t = f.tokens[j]
+        while 0 <= j < len(text.tokens) and len(ctx) < CTX_WORDS:
+            t = text.tokens[j]
             if not t.delete and isinstance(t, Word):
                 ctx.append(t.simpletext.lower())
             j += d
@@ -149,34 +149,37 @@ class Sep(Token):
 
 
 class Sample:
-    def __init__(self, file, key):
-        self.file = file
+    def __init__(self, text, key):
+        assert key is None or isinstance(key, tuple)
+        self.text = text
         self.key = key
         self.words = []
 
     def set_name(self):
-        self.name = self.file.samplenames.get(self.key)
+        self.name = self.text.samplenames.get(self.key)
 
 
-class File:
-    def __init__(self, source, filename, shortname):
-        self.source = source
-        self.conc = source.conc
-        self.filename = filename
-        self.shortname = shortname
-        self.safename = source.safenames.get(shortname)
+class Text:
+    def __init__(self, file, key):
+        assert isinstance(key, tuple)
+        self.file = file
+        self.conc = file.conc
+        self.key = key
+        fullkey = (file.shortname,) + key
+        self.safename = file.source.safenames.get(fullkey)
         self.htmlfile = self.safename + ".html"
-        self.url = source.url + '/' + self.htmlfile
-        self.htmlpath = os.path.join(source.htmlpath, self.htmlfile)
+        self.url = file.source.url + '/' + self.htmlfile
+        self.htmlpath = os.path.join(file.source.htmlpath, self.htmlfile)
         self.samplenames = naming.printable_naming()
         self.samples = {}
 
-    def read(self):
-        with open(self.filename, encoding=self.conc.config.encoding) as f:
-            self.data = f.read()
+    def set_name(self):
+        self.name = self.file.textnames.get(self.key)
+        self.fullname = self.file.shortname
+        if self.name != '':
+            self.fullname += ": " + self.name
 
     def process(self):
-        self.parse()
         self.clean()
         self.report()
 
@@ -190,12 +193,87 @@ class File:
     def get_html(self):
         content = [t.html() for t in self.tokens]
         head = E.head(
-            E.title(self.shortname),
+            E.title(self.fullname),
             E.meta(charset="UTF-8"),
             E.style(kstyle.css),
         )
         body = E.body(E.pre(*content))
         return E.html(head, body, lang="en")
+
+    def clean(self):
+        m = len(self.conc.config.delete_pair)
+        stack = [ [] for x in range(m) ]
+        delete_range = []
+        for j,t in enumerate(self.tokens):
+            if isinstance(t, Tag):
+                for x in t.delete_open:
+                    stack[x].append(j)
+                for x in t.delete_close:
+                    if len(stack[x]) == 0:
+                        self.conc.warn(self.file.filename, "{}: no matching opening tag".format(t.descr()))
+                    else:
+                        i = stack[x].pop()
+                        delete_range.append((i,j))
+        for l in stack:
+            for i in l:
+                t = self.tokens[i]
+                self.conc.warn(self.file.filename, "{}: no matching closing tag".format(t.descr()))
+        for i,j in delete_range:
+            for k in range(i,j+1):
+                self.tokens[k].delete = True
+        self.words = []
+        samplekey = None
+        for i,t in enumerate(self.tokens):
+            if isinstance(t, Tag) and not t.delete and t.samplekey is not None:
+                samplekey = t.samplekey
+            if isinstance(t, Word) and not t.delete:
+                sample = self.get_sample(samplekey)
+                if len(t.match) > 0:
+                    t.set_context(self, i, sample)
+                self.words.append(t)
+                sample.words.append(t)
+
+    def get_sample(self, samplekey):
+        if samplekey not in self.samples:
+            self.samples[samplekey] = Sample(self, samplekey)
+        return self.samples[samplekey]
+
+    def report(self):
+        self.samplelist = [self.samples[x] for x in sorted(self.samples.keys())]
+        for sample in self.samplelist:
+            sample.set_name()
+        for w in self.words:
+            for search in w.match:
+                search.add(w, self)
+        self.report2(self.words)
+        for sample in self.samplelist:
+            self.report2(sample.words, sample)
+
+    def report2(self, words, sample=None):
+        counts = { s.key: kutil.Counter() for s in self.conc.search }
+        for w in words:
+            for search in w.match:
+                counts[search.key].add(w.lemma)
+        self.conc.add(self, sample, len(words), counts)
+
+
+class File:
+    def __init__(self, source, filename, shortname):
+        assert isinstance(shortname, str)
+        self.source = source
+        self.conc = source.conc
+        self.filename = filename
+        self.shortname = shortname
+        self.textnames = naming.printable_naming()
+        self.texts = []
+
+    def read(self):
+        with open(self.filename, encoding=self.conc.config.encoding) as f:
+            self.data = f.read()
+
+    def process(self):
+        self.parse()
+        self.split()
 
     def parse(self):
         self.tokens = []
@@ -243,61 +321,12 @@ class File:
             else:
                 self.char += 1
 
-    def clean(self):
-        m = len(self.conc.config.delete_pair)
-        stack = [ [] for x in range(m) ]
-        delete_range = []
-        for j,t in enumerate(self.tokens):
-            if isinstance(t, Tag):
-                for x in t.delete_open:
-                    stack[x].append(j)
-                for x in t.delete_close:
-                    if len(stack[x]) == 0:
-                        self.conc.warn(self.filename, "{}: no matching opening tag".format(t.descr()))
-                    else:
-                        i = stack[x].pop()
-                        delete_range.append((i,j))
-        for l in stack:
-            for i in l:
-                t = self.tokens[i]
-                self.conc.warn(self.filename, "{}: no matching closing tag".format(t.descr()))
-        for i,j in delete_range:
-            for k in range(i,j+1):
-                self.tokens[k].delete = True
-        self.words = []
-        samplekey = None
-        for i,t in enumerate(self.tokens):
-            if isinstance(t, Tag) and not t.delete and t.samplekey is not None:
-                samplekey = t.samplekey
-            if isinstance(t, Word) and not t.delete:
-                sample = self.get_sample(samplekey)
-                if len(t.match) > 0:
-                    t.set_context(self, i, sample)
-                self.words.append(t)
-                sample.words.append(t)
-
-    def get_sample(self, samplekey):
-        if samplekey not in self.samples:
-            self.samples[samplekey] = Sample(self, samplekey)
-        return self.samples[samplekey]
-
-    def report(self):
-        self.samplelist = [self.samples[x] for x in sorted(self.samples.keys())]
-        for sample in self.samplelist:
-            sample.set_name()
-        for w in self.words:
-            for search in w.match:
-                search.add(w, self)
-        self.report2(self.words)
-        for sample in self.samplelist:
-            self.report2(sample.words, sample)
-
-    def report2(self, words, sample=None):
-        counts = { s.key: kutil.Counter() for s in self.conc.search }
-        for w in words:
-            for search in w.match:
-                counts[search.key].add(w.lemma)
-        self.conc.add(self, sample, len(words), counts)
+    def split(self):
+        t = Text(self, ())
+        t.tokens = self.tokens
+        self.texts = [t]
+        for t in self.texts:
+            t.set_name()
 
 
 class Source:
@@ -324,7 +353,7 @@ class Source:
         shortnames = pathabbr.pathabbr(l)
         self.files = []
         for filename in l:
-            print('.', end='', flush=True)
+            print(':', end='', flush=True)
             f = File(self, filename, shortnames[filename])
             self.files.append(f)
             try:
@@ -333,11 +362,14 @@ class Source:
                 print()
                 kutil.exception_exit('error reading input file: {}'.format(filename))
             f.process()
-            try:
-                f.write()
-            except:
-                print()
-                kutil.exception_exit('error writing output file: {}'.format(f.htmlfile))
+            for t in f.texts:
+                print('.', end='', flush=True)
+                t.process()
+                try:
+                    t.write()
+                except:
+                    print()
+                    kutil.exception_exit('error writing output file: {}'.format(t.htmlfile))
         print()
 
 
@@ -358,6 +390,7 @@ class Search():
             ("Link",),
             ("Source",),
             ("File",),
+            ("Text",),
             ("Sample",),
             ("Line",),
             ("Column",),
@@ -365,16 +398,17 @@ class Search():
             ("Right", "light", 10),
         ]
 
-    def add(self, word, f):
+    def add(self, word, text):
         self.xs.write_number(self.xs.r)
         self.xs.write_rich(word.before)
         self.xs.write_string(word.simpletext)
         self.xs.write_rich(word.after)
         self.xs.write_string(word.lemma)
         self.xs.write_string(word.lemma)
-        self.xs.write_url(word.link(f), "text")
-        self.xs.write_string(f.source.key)
-        self.xs.write_string(f.shortname)
+        self.xs.write_url(word.link(text), "text")
+        self.xs.write_string(text.file.source.key)
+        self.xs.write_string(text.file.shortname)
+        self.xs.write_string(text.name)
         self.xs.write_string(word.sample.name)
         self.xs.write_number(word.line)
         self.xs.write_number(word.char)
@@ -423,6 +457,7 @@ class Conc():
         cols.append(("Link",))
         cols.append(("Source",))
         cols.append(("File",))
+        cols.append(("Text",))
         if what == "samples":
             cols.append(("Sample",))
         elif what == "files":
@@ -436,14 +471,15 @@ class Conc():
             cols.append(("{} types".format(s.key),))
         return cols
 
-    def add(self, f, sample, words, counts):
+    def add(self, text, sample, words, counts):
         if sample is None:
             xs = self.xsf
         else:
             xs = self.xss
-        xs.write_url(f.url, "text")
-        xs.write_string(f.source.key)
-        xs.write_string(f.shortname)
+        xs.write_url(text.url, "text")
+        xs.write_string(text.file.source.key)
+        xs.write_string(text.file.shortname)
+        xs.write_string(text.name)
         if sample is not None:
             xs.write_string(sample.name)
         xs.write_number(words)
