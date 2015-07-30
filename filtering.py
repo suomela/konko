@@ -41,7 +41,7 @@ def safe(s):
     s = stringify(s)
     s = s.lower()
     s = unicodedata.normalize('NFKD', s)
-    s = ''.join(c for c in s if unicodedata.category(c) not in ('Mn'))
+    s = ''.join(c for c in s if unicodedata.category(c) not in ('Mn',))
     s = _unsafe.sub('-', s)
     s = s.strip('-')
     if s == '':
