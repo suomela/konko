@@ -50,6 +50,8 @@ def try_exact_match(r, w):
 
 
 def try_capture(r, w):
+    if r is None:
+        return None
     m = r.match(w)
     if not is_exact(m, w):
         return None
@@ -88,6 +90,9 @@ class Counter:
 
 
 class TestCapture(unittest.TestCase):
+    def test_none(self):
+        self.assertEqual(try_capture(None, ' abc'), None)
+
     def test_noparen(self):
         r = re.compile(r'ab*c')
         self.assertEqual(try_capture(r, ' abc'), None)
