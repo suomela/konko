@@ -7,20 +7,38 @@ import kutil
 
 
 class Excel:
-    def __init__(self, filename, cols):
+    def __init__(self, filename):
         try:
             self.wb = xlsxwriter.Workbook(filename)
         except:
             kutil.exception_exit('error creating output file: {}'.format(filename))
-        self.cols = cols
         self.fmt = { k: self.wb.add_format(v) for k, v in kstyle.excel_format.items() }
-        self.ws = self.wb.add_worksheet()
+        self.sheets = []
+
+    def sheet(self, name, cols):
+        return Sheet(self, name, cols)
+
+    def close(self):
+        for s in self.sheets:
+            s.close()
+        self.wb.close()
+
+
+class Sheet:
+    def __init__(self, xl, name, cols):
+        self.isopen = True
+        self.xl = xl
+        self.ws = self.xl.wb.add_worksheet(name)
+        self.cols = cols
         self.widths = collections.defaultdict(int)
         self.r = 1
         self.c = 0
+        self.xl.sheets.append(self)
 
     def close(self):
-        self.ws.set_row(0, None, self.fmt["bold"])
+        if not self.isopen:
+            return
+        self.ws.set_row(0, None, self.xl.fmt["bold"])
         self.r = 0
         self.c = 0
         for col in self.cols:
@@ -34,9 +52,9 @@ class Excel:
             if fmt is None:
                 self.ws.set_column(c, c, width)
             else:
-                self.ws.set_column(c, c, width, self.fmt[fmt])
+                self.ws.set_column(c, c, width, self.xl.fmt[fmt])
         self.ws.freeze_panes(1, 0)
-        self.wb.close()
+        self.isopen = False
 
     def next_row(self):
         self.r += 1
@@ -65,7 +83,7 @@ class Excel:
         s = ""
         for fmt, txt in v:
             if fmt != "normal":
-                l.append(self.fmt[fmt])
+                l.append(self.xl.fmt[fmt])
             l.append(txt)
             s += txt
         if len(l) > 0:

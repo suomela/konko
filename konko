@@ -340,25 +340,26 @@ class Search():
         ]
 
     def add(self, word, f):
-        self.xl.write_number(self.xl.r)
-        self.xl.write_rich(word.before)
-        self.xl.write_string(word.simpletext)
-        self.xl.write_rich(word.after)
-        self.xl.write_string(word.lemma)
-        self.xl.write_string(word.lemma)
-        self.xl.write_url(word.link(f), f.source.key)
-        self.xl.write_string(f.shortname)
-        self.xl.write_string(f.samplenames.get(word.samplekey))
-        self.xl.write_number(word.line)
-        self.xl.write_number(word.char)
-        self.xl.write_string(word.left)
-        self.xl.write_string(word.right)
-        self.xl.next_row()
+        self.xs.write_number(self.xs.r)
+        self.xs.write_rich(word.before)
+        self.xs.write_string(word.simpletext)
+        self.xs.write_rich(word.after)
+        self.xs.write_string(word.lemma)
+        self.xs.write_string(word.lemma)
+        self.xs.write_url(word.link(f), f.source.key)
+        self.xs.write_string(f.shortname)
+        self.xs.write_string(f.samplenames.get(word.samplekey))
+        self.xs.write_number(word.line)
+        self.xs.write_number(word.char)
+        self.xs.write_string(word.left)
+        self.xs.write_string(word.right)
+        self.xs.next_row()
 
     def xl_open(self):
         xlsx = self.key + ".xlsx"
         filename = os.path.join(self.conc.config.output_dir, xlsx)
-        self.xl = kexcel.Excel(filename, self.get_columns())
+        self.xl = kexcel.Excel(filename)
+        self.xs = self.xl.sheet("Concordance", self.get_columns())
 
     def xl_close(self):
         self.xl.close()
@@ -404,19 +405,20 @@ class Conc():
         return cols
 
     def add(self, f, words, counts):
-        self.xl.write_url(f.url, f.source.key)
-        self.xl.write_string(f.shortname)
-        self.xl.write_number(words)
+        self.xs.write_url(f.url, f.source.key)
+        self.xs.write_string(f.shortname)
+        self.xs.write_number(words)
         for s in self.search:
-            self.xl.write_number(counts[s.key].total)
+            self.xs.write_number(counts[s.key].total)
         for s in self.search:
-            self.xl.write_number(counts[s.key].types())
-        self.xl.next_row()
+            self.xs.write_number(counts[s.key].types())
+        self.xs.next_row()
 
     def xl_open(self):
         xlsx = "summary.xlsx"
         filename = os.path.join(self.config.output_dir, xlsx)
-        self.xl = kexcel.Excel(filename, self.get_columns())
+        self.xl = kexcel.Excel(filename)
+        self.xs = self.xl.sheet("Files", self.get_columns())
 
     def xl_close(self):
         self.xl.close()
