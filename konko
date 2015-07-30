@@ -17,6 +17,11 @@ import kutil
 REPORT = 10000
 
 
+def write(s):
+    sys.stdout.write(s)
+    sys.stdout.flush()
+
+
 class Token:
     def html(self):
         i = self.html_id()
@@ -327,7 +332,7 @@ class File:
             else:
                 self.char += 1
         if len(self.tokens) % REPORT == 0:
-            print('-', end='', flush=True)
+            write('-')
 
     def split(self):
         text = None
@@ -361,11 +366,8 @@ class Source:
     def process(self):
         self.url = self.conc.url + '/' + self.safename
         self.htmlpath = os.path.join(self.conc.config.output_dir, self.safename)
-        try:
-            os.makedirs(self.htmlpath, exist_ok=True)
-        except:
-            kutil.exception_exit('error creating output directory: {}'.format(self.htmlpath))
-        print(self.key, end=' ', flush=True)
+        kutil.try_makedirs(self.htmlpath)
+        write(self.key + ' ')
         skip = set(kutil.listglob(self.conc.config.skip_files))
         l = kutil.listglob(self.globs)
         l = [x for x in l if x not in skip]
@@ -374,24 +376,24 @@ class Source:
         shortnames = pathabbr.pathabbr(l)
         self.files = []
         for filename in l:
-            print(':', end='', flush=True)
+            write(':')
             f = File(self, filename, shortnames[filename])
             self.files.append(f)
             try:
                 f.read()
             except:
-                print()
+                write('\n')
                 kutil.exception_exit('error reading input file: {}'.format(filename))
             f.process()
             for t in f.texts:
-                print('.', end='', flush=True)
+                write('.')
                 t.process()
                 try:
                     t.write()
                 except:
-                    print()
+                    write('\n')
                     kutil.exception_exit('error writing output file: {}'.format(t.htmlfile))
-        print()
+        write('\n')
 
 
 class Search():
@@ -456,11 +458,12 @@ class Conc():
         self.search = [Search(self, key, re) for key, re in self.config.search]
 
     def warn(self, filename, msg):
-        print('!', end='', flush=True)
+        write('!')
         self.log(filename, msg)
 
     def log(self, filename, msg):
-        print('{}: {}'.format(filename, msg), file=self.log_file, flush=True)
+        self.log_file.write('{}: {}\n'.format(filename, msg))
+        self.log_file.flush()
 
     def log_open(self):
         filename = os.path.join(self.config.output_dir, "log.txt")
@@ -522,10 +525,7 @@ class Conc():
 
     def do(self):
         self.url = 'http://localhost:{}'.format(self.config.server_port)
-        try:
-            os.makedirs(self.config.output_dir, exist_ok=True)
-        except:
-            kutil.exception_exit('error creating output directory: {}'.format(self.config.output_dir))
+        kutil.try_makedirs(self.config.output_dir)
         self.log_open()
         self.xl_open()
         for search in self.search:

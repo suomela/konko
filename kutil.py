@@ -2,6 +2,7 @@
 
 import unittest
 import glob
+import os
 import re
 import sys
 
@@ -20,6 +21,14 @@ def listglob(globs):
             sys.exit('pattern does not match any file: {}'.format(x))
         l += g
     return l
+
+
+def try_makedirs(path):
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except:
+            exception_exit('error creating directory: {}'.format(path))
 
 
 def safe_regex(x, flags):
