@@ -1,6 +1,6 @@
+# coding=utf-8
 u"""Generating safe, printable string."""
 
-from __future__ import absolute_import
 import re
 import unicodedata
 import unittest
@@ -21,13 +21,28 @@ def stringify(s):
 
 def printable(s):
     s = stringify(s)
-    if s.isprintable():
-        return s
-    return u''.join(c if c.isprintable() else u' ' for c in s if c.isprintable() or c.isspace())
+    r = u''
+    for c in s:
+        if c.isspace():
+            r += u' '
+        elif unicodedata.category(c)[0] not in 'CZ':
+            r += c
+    return r
 
 
 def printable_nl(s):
     s = stringify(s)
+    r = u''
+    for c in s:
+        if c == u'\n':
+            r += c
+        elif c.isspace():
+            r += u' '
+        elif unicodedata.category(c)[0] not in 'CZ':
+            r += c
+    return r
+
+
     if s.isprintable():
         return s
     return u''.join(c if c.isprintable() or c == u'\n' else u' ' for c in s if c.isprintable() or c.isspace())

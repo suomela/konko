@@ -1,6 +1,5 @@
 u"""Generating Excel files."""
 
-from __future__ import absolute_import
 import collections
 import xlsxwriter
 import kstyle
