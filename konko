@@ -14,6 +14,9 @@ import kstyle
 import kutil
 
 
+REPORT = 10000
+
+
 class Token:
     def html(self):
         i = self.html_id()
@@ -117,6 +120,7 @@ class Tag(Token):
         return 'tag {} on line {}, column {}'.format(self.raw, self.line, self.char)
 
     def process(self, conc):
+        self.textkey = kutil.try_capture(conc.config.text, self.raw)
         self.samplekey = kutil.try_capture(conc.config.sample, self.raw)
         for a in conc.config.delete:
             if kutil.exact_match(a, self.raw):
@@ -150,7 +154,7 @@ class Sep(Token):
 
 class Sample:
     def __init__(self, text, key):
-        assert key is None or isinstance(key, tuple)
+        assert isinstance(key, tuple)
         self.text = text
         self.key = key
         self.words = []
@@ -171,7 +175,8 @@ class Text:
         self.url = file.source.url + '/' + self.htmlfile
         self.htmlpath = os.path.join(file.source.htmlpath, self.htmlfile)
         self.samplenames = naming.printable_naming()
-        self.samples = {}
+        self.samplemap = {}
+        self.tokens = []
 
     def set_name(self):
         self.name = self.file.textnames.get(self.key)
@@ -222,9 +227,9 @@ class Text:
             for k in range(i,j+1):
                 self.tokens[k].delete = True
         self.words = []
-        samplekey = None
+        samplekey = ()
         for i,t in enumerate(self.tokens):
-            if isinstance(t, Tag) and not t.delete and t.samplekey is not None:
+            if isinstance(t, Tag) and t.samplekey is not None:
                 samplekey = t.samplekey
             if isinstance(t, Word) and not t.delete:
                 sample = self.get_sample(samplekey)
@@ -234,12 +239,12 @@ class Text:
                 sample.words.append(t)
 
     def get_sample(self, samplekey):
-        if samplekey not in self.samples:
-            self.samples[samplekey] = Sample(self, samplekey)
-        return self.samples[samplekey]
+        if samplekey not in self.samplemap:
+            self.samplemap[samplekey] = Sample(self, samplekey)
+        return self.samplemap[samplekey]
 
     def report(self):
-        self.samplelist = [self.samples[x] for x in sorted(self.samples.keys())]
+        self.samplelist = [self.samplemap[x] for x in sorted(self.samplemap.keys())]
         for sample in self.samplelist:
             sample.set_name()
         for w in self.words:
@@ -266,6 +271,7 @@ class File:
         self.shortname = shortname
         self.textnames = naming.printable_naming()
         self.texts = []
+        self.textmap = {}
 
     def read(self):
         with open(self.filename, encoding=self.conc.config.encoding) as f:
@@ -320,13 +326,28 @@ class File:
                 self.char = 1
             else:
                 self.char += 1
+        if len(self.tokens) % REPORT == 0:
+            print('-', end='', flush=True)
 
     def split(self):
-        t = Text(self, ())
-        t.tokens = self.tokens
-        self.texts = [t]
-        for t in self.texts:
-            t.set_name()
+        text = None
+        for i,t in enumerate(self.tokens):
+            if isinstance(t, Tag) and t.textkey is not None:
+                text = self.get_text(t.textkey)
+            if text is None:
+                text = self.get_text(())
+            text.tokens.append(t)
+        for text in self.texts:
+            text.set_name()
+
+    def get_text(self, textkey):
+        if textkey in self.textmap:
+            return self.textmap[textkey]
+        else:
+            text = Text(self, textkey)
+            self.textmap[textkey] = text
+            self.texts.append(text)
+            return text
 
 
 class Source:

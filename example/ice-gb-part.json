@@ -1,24 +1,24 @@
 {
     "source": {
-        "ice-gb": [ "corpus/ice/ICE Great Britain/ice-gb.txt" ]
+        "ice-gb": [ "corpus/ice/ICE Great Britain/ice-gb-part.txt" ]
     },
     "output-dir": "output/ice-gb",
     "encoding": "1252",
     "context": 100,
-    "word": "\\w+([-']\\w+)*",
     "search": {
         "ness": ".*(n[e']ss.*|snss)",
         "ity": ".*([ie]t(y|ie).*|vty)"
     },
+    "word": "\\w+([-']\\w+)*",
     "tag": "<[^<>]+>",
-    "text": "<([^#]+?) #.*>",
-    "sample": "<[^#]+#[^#:]+:[^#:]+:([^#:]+)>",
     "delete": [
         ["<.*#.*>"],
         ["<O>", "</O>"],
         ["<X>", "</X>"],
         ["<&>", "</&>"]
     ],
+    "text": "<([^#]+?) #.*>",
+    "sample": "<[^#]+#[^#:]+:[^#:]+:([^#:]+)>",
     "search-ignore-case": true,
     "word-ignore-case": false,
     "tag-ignore-case": false

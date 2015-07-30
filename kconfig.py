@@ -17,6 +17,7 @@ class KConfig:
         self.search = []
         self.delete = []
         self.delete_pair = []
+        self.text = None
         self.sample = None
         self.tag = None
         self.word = re.compile(r"\w+([-']\w+)*")
@@ -113,6 +114,9 @@ class KConfig:
                 self.skip_files += v
             elif key == 'delete':
                 self.set_delete(p, v)
+            elif key == 'text':
+                self.expect(p, str, v)
+                self.text = kutil.safe_regex(v, self.tag_flags)
             elif key == 'sample':
                 self.expect(p, str, v)
                 self.sample = kutil.safe_regex(v, self.tag_flags)
