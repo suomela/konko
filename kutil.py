@@ -29,46 +29,46 @@ def safe_regex(x, flags):
         exception_exit('error parsing regex: {}'.format(x))
 
 
-def try_search(re, w, i):
-    if re is None:
+def try_search(r, w, i):
+    if r is None:
         return None
     else:
-        return re.search(w, i)
+        return r.search(w, i)
 
 
 def is_exact(m, w):
     return m is not None and m.start() == 0 and m.end() == len(w)
 
 
-def exact_match(re, w):
-    m = re.match(w)
+def exact_match(r, w):
+    m = r.match(w)
     return is_exact(m, w)
 
 
-def try_exact_match(re, w):
-    return re is not None and exact_match(re, w)
+def try_exact_match(r, w):
+    return r is not None and exact_match(r, w)
 
 
-def try_capture(re, w):
-    m = re.match(w)
+def try_capture(r, w):
+    m = r.match(w)
     if not is_exact(m, w):
         return None
-    r = []
+    x = []
     if m.lastindex is not None:
         for i in range(m.lastindex):
             g = m.group(i + 1)
             if g is not None and g != '':
-                r.append(g)
-    if len(r) == 0:
-        r.append(m.group())
-    return tuple(r)
+                x.append(g)
+    if len(x) == 0:
+        x.append(m.group())
+    return tuple(x)
 
 
-def try_capture_join(re, w, sep=' '):
-    r = try_capture(re, w)
-    if r is None:
+def try_capture_join(r, w, sep=' '):
+    x = try_capture(r, w)
+    if x is None:
         return None
-    return sep.join(r)
+    return sep.join(x)
 
 
 class Counter:
