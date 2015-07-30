@@ -29,6 +29,24 @@ everything:
     pip install xlsxwriter
 
 
+
+PyPy
+----
+
+You can also use PyPy for extra speed.
+
+If you have OS X and Homebrew, use the following commands to install
+everything:
+
+    brew install pypy
+    pip_pypy install xlsxwriter
+
+Then use the tool as follows:
+
+    pypy konko CONFIGURATION
+    pypy konko-server CONFIGURATION
+
+
 Configuration
 -------------
 
