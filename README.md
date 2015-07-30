@@ -20,13 +20,13 @@ files. Press ctrl-c to stop the server.
 Dependencies
 ------------
 
-Python, XlsxWriter, and lxml.
+Python and XlsxWriter.
 
 If you have OS X and Homebrew, use the following commands to install
 everything:
 
     brew install python
-    pip install lxml xlsxwriter
+    pip install xlsxwriter
 
 
 Configuration

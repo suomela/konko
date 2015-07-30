@@ -2,9 +2,7 @@
 
 import os
 import sys
-import lxml.html
-from lxml.builder import E
-from lxml import etree
+import cgi
 import filtering
 import naming
 import pathabbr
@@ -27,15 +25,21 @@ class Token(object):
     def html(self):
         i = self.html_id()
         k = self.html_class()
-        attr = {}
+        attr = []
         if len(k) > 0:
-            attr[u"class"] = u" ".join(k)
+            attr.append((u"class", u" ".join(k)))
         if i is not None:
-            attr[u"id"] = i
+            attr.append((u"id", i))
         if len(attr) > 0:
-            return E.span(self.longtext, **attr)
+            r = '<span'
+            for k, v in attr:
+                r += ' {}="{}"'.format(k, cgi.escape(v, quote=True))
+            r += '>'
+            r += cgi.escape(self.longtext, quote=False)
+            r += '</span>'
+            return r
         else:
-            return self.longtext
+            return cgi.escape(self.longtext, quote=False)
 
     def process0(self):
         self.delete = False
@@ -195,21 +199,29 @@ class Text(object):
         self.report()
 
     def write(self):
-        doc = self.get_html()
-        with open(self.htmlpath, u"bw") as f:
-            f.write('<!DOCTYPE html>\n')
-            f.write(lxml.html.tostring(doc))
-            f.write('\n')
-
-    def get_html(self):
-        content = [t.html() for t in self.tokens]
-        head = E.head(
-            E.title(self.fullname),
-            E.meta(charset=u"UTF-8"),
-            E.style(kstyle.css),
-        )
-        body = E.body(E.pre(*content))
-        return E.html(head, body, lang=u"en")
+        HEAD = u'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>{}</title>
+<meta charset="UTF-8">
+<style>
+{}
+</style>
+</head>
+<body>
+<pre>'''
+        FOOT = u'''</pre>
+</body>
+</html>
+'''
+        with open(self.htmlpath, u"w") as f:
+            f.write(HEAD.format(
+                cgi.escape(self.fullname, quote=False),
+                cgi.escape(kstyle.css, quote=False)
+            ))
+            for t in self.tokens:
+                f.write(t.html())
+            f.write(FOOT)
 
     def clean(self):
         m = len(self.conc.config.delete_pair)
