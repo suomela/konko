@@ -56,7 +56,7 @@ class Word(Token):
         return u"l{}c{}".format(self.line, self.char)
 
     def html_class(self):
-        k = []
+        k = [u"word"]
         if self.delete:
             k.append(u"del")
         elif len(self.match) > 0:

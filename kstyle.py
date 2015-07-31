@@ -28,4 +28,17 @@ css = u"""
     color: #0a0;
     font-size: 1.5em;
 }
+.word:hover {
+    color: #fff;
+    background-color: #000;
+}
+.tag:hover {
+    color: #fff;
+    background-color: #00c;
+}
+.sep:hover {
+    color: #fff;
+    background-color: #c00;
+}
+
 """
