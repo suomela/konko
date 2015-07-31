@@ -8,19 +8,24 @@ excel_format = {
     u"light": {u'font_color': u'#999999'},
 }
 
-
+# .s: separator
+# .t: tag
+# .w: word
+# .d: deleted
+# .i: sample identifier
+# .m: matching word
 css = u"""
-.sep, .tag, .del {
+.s, .t, .d {
     color: #999;
 }
-.tag, .del {
+.t, .d {
     font-size: 0.8em;
 }
-.sample {
+.i {
     color: #00f;
     font-weight: 700;
 }
-.match {
+.m {
     color: #d00;
     font-weight: 700;
 }
@@ -28,15 +33,15 @@ css = u"""
     color: #0a0;
     font-size: 1.5em;
 }
-.word:hover {
+.w:hover {
     color: #fff;
     background-color: #000;
 }
-.tag:hover {
+.t:hover {
     color: #fff;
     background-color: #00c;
 }
-.sep:hover {
+.s:hover {
     color: #fff;
     background-color: #c00;
 }

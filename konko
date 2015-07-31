@@ -56,11 +56,11 @@ class Word(Token):
         return u"l{}c{}".format(self.line, self.char)
 
     def html_class(self):
-        k = [u"word"]
+        k = [u"w"]
         if self.delete:
-            k.append(u"del")
+            k.append(u"d")
         elif len(self.match) > 0:
-            k.append(u"match")
+            k.append(u"m")
         return k
 
     def link(self, text):
@@ -122,11 +122,11 @@ class Tag(Token):
         return None
 
     def html_class(self):
-        k = [u"tag"]
+        k = [u"t"]
         if self.delete:
-            k.append(u"del")
+            k.append(u"d")
         if self.samplekey is not None:
-            k.append(u"sample")
+            k.append(u"i")
         return k
 
     def descr(self):
@@ -156,7 +156,7 @@ class Sep(Token):
         return None
 
     def html_class(self):
-        return [u"sep"]
+        return [u"s"]
 
     def process(self, conc):
         pass
