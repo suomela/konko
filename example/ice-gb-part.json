@@ -17,8 +17,13 @@
         ["<X>", "</X>"],
         ["<&>", "</&>"]
     ],
+    "compound": [
+        ["<w>", "</w>"]
+    ],
     "text": "<([^#]+?) #.*>",
     "sample": "<[^#]+#[^#:]+:[^#:]+:([^#:]+)>",
+    "tag-breaks-word": true,
+    "separators-in-compound": true,
     "search-ignore-case": true,
     "word-ignore-case": false,
     "tag-ignore-case": false

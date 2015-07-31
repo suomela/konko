@@ -22,106 +22,45 @@ def write(s):
 
 
 class Token(object):
-    def html(self):
-        i = self.html_id()
-        k = self.html_class()
-        attr = []
-        if len(k) > 0:
-            attr.append((u"class", u" ".join(k)))
-        if i is not None:
-            attr.append((u"id", i))
-        if len(attr) > 0:
-            r = '<span'
-            for k, v in attr:
-                r += ' {}="{}"'.format(k, cgi.escape(v, quote=True))
-            r += '>'
-            r += cgi.escape(self.longtext, quote=False)
-            r += '</span>'
-            return r
-        else:
-            return cgi.escape(self.longtext, quote=False)
+    def write(self, f, match):
+        class_string = u' '.join(self.html_class(match))
+        longtext = filtering.printable_nl(self.raw)
+        f.write(u'<span class="')
+        f.write(cgi.escape(class_string, quote=True))
+        f.write(u'">')
+        f.write(cgi.escape(longtext, quote=False))
+        f.write(u'</span>')
+
+    def html_id(self):
+        return u"l{}c{}".format(self.line, self.char)
 
     def process0(self):
         self.delete = False
-        self.longtext = filtering.printable_nl(self.raw)
+        self.merge_next = False
         self.simpletext = filtering.printable_compact(self.raw)
 
 
 class Word(Token):
-    def html_id(self):
-        if self.delete:
-            return None
-        if len(self.match) == 0:
-            return None
-        return u"l{}c{}".format(self.line, self.char)
-
-    def html_class(self):
+    def html_class(self, match):
         k = [u"w"]
         if self.delete:
             k.append(u"d")
-        elif len(self.match) > 0:
+        if match:
             k.append(u"m")
         return k
 
-    def link(self, text):
-        i = self.html_id()
-        assert i is not None
-        return u'{}#{}'.format(text.url, i)
-
     def process(self, conc):
-        self.lemma = self.simpletext.lower()
-        self.match = []
-        for search in conc.search:
-            if kutil.exact_match(search.re, self.raw):
-                self.match.append(search)
+        pass
 
-    def set_context(self, text, i, sample):
-        assert text.tokens[i] == self
-        self.sample = sample
-        cb = self.get_context(text, i, -1)
-        ca = self.get_context(text, i, +1)
-        cb.reverse()
-        self.before = kexcel.rich_simplify(cb)
-        self.after = kexcel.rich_simplify(ca)
-        self.left = self.get_context_simple(text, i, -1)
-        self.right = self.get_context_simple(text, i, +1)
-
-    def get_context(self, text, i, d):
-        ctx = []
-        j = i + d
-        l = 0
-        while 0 <= j < len(text.tokens) and l < text.conc.config.context:
-            t = text.tokens[j]
-            if not t.delete:
-                fmt, txt = t.for_context()
-                l += len(txt)
-                ctx.append((fmt, txt))
-            j += d
-        return ctx
-
-    def get_context_simple(self, text, i, d):
-        CTX_WORDS = 4
-        ctx = []
-        j = i + d
-        while 0 <= j < len(text.tokens) and len(ctx) < CTX_WORDS:
-            t = text.tokens[j]
-            if not t.delete and isinstance(t, Word):
-                ctx.append(t.simpletext.lower())
-            j += d
-        return u' '.join(ctx)
-
-    def for_context(self):
-        if len(self.match) > 0:
+    def for_context_rich(self, match):
+        if match:
             return u"hl", self.simpletext
         else:
             return u"normal", self.simpletext
 
 
 class Tag(Token):
-    def html_id(self):
-        return None
-
-    def html_class(self):
+    def html_class(self, match):
         k = [u"t"]
         if self.delete:
             k.append(u"d")
@@ -138,31 +77,137 @@ class Tag(Token):
         for a in conc.config.delete:
             if kutil.exact_match(a, self.raw):
                 self.delete = True
-        self.delete_open = []
-        self.delete_close = []
-        for i, a in enumerate(conc.config.delete_pair):
+        self.pairs = {
+            "delete": self.try_pairs(conc.config.delete_pair),
+            "compound": self.try_pairs(conc.config.compound_pair),
+        }
+
+    def try_pairs(self, pairs):
+        p_open = []
+        p_close = []
+        for i, a in enumerate(pairs):
             a1, a2 = a
             if kutil.exact_match(a1, self.raw):
-                self.delete_open.append(i)
+                p_open.append(i)
             if kutil.exact_match(a2, self.raw):
-                self.delete_close.append(i)
+                p_close.append(i)
+        return p_open, p_close
 
-    def for_context(self):
+    def for_context_rich(self, match):
         return u"light", self.simpletext
 
 
 class Sep(Token):
-    def html_id(self):
-        return None
-
-    def html_class(self):
+    def html_class(self, match):
         return [u"s"]
 
     def process(self, conc):
         pass
 
-    def for_context(self):
+    def for_context_rich(self, match):
         return u"normal", self.simpletext
+
+
+class Compound(object):
+    def __init__(self, tokens):
+        assert len(tokens) > 0
+        self.tokens = tokens
+
+    def write(self, f):
+        match = len(self.match) > 0
+        if match:
+            f.write(u'<span class="c" id="')
+            f.write(cgi.escape(self.tokens[0].html_id(), quote=True))
+            f.write(u'">')
+        else:
+            f.write(u'<span class="c">')
+        for t in self.tokens:
+            t.write(f, match)
+        f.write(u'</span>')
+
+    def do_match(self, conc):
+        self.has_word = False
+        self.raw = ''
+        self.word_raw = ''
+        self.samplekey = None
+        for t in self.tokens:
+            self.raw += t.raw
+            if isinstance(t, Word):
+                if not t.delete:
+                    self.has_word = True
+                    self.word_raw += t.raw
+            elif isinstance(t, Tag):
+                if t.samplekey is not None:
+                    assert self.samplekey is None
+                    self.samplekey = t.samplekey
+            elif isinstance(t, Sep):
+                if conc.config.separators_in_compound and not t.delete:
+                    self.word_raw += t.raw
+
+        self.match = []
+        if not self.has_word:
+            return
+        self.compword = filtering.printable_compact(self.word_raw)
+        self.simpletext = filtering.printable_compact(self.raw)
+        self.lemma = self.compword.lower()
+        for search in conc.search:
+            if kutil.exact_match(search.re, self.word_raw):
+                self.match.append(search)
+
+    def link(self, text):
+        i = self.tokens[0].html_id()
+        assert i is not None
+        return u'{}#{}'.format(text.url, i)
+
+    def set_context(self, text, i, sample):
+        assert text.compounds[i] == self
+        self.sample = sample
+        cb = self.get_context_rich(text, i, -1)
+        cc = self.get_this_rich()
+        ca = self.get_context_rich(text, i, +1)
+        self.rich_before = kexcel.rich_simplify(cb)
+        self.rich = kexcel.rich_simplify(cc)
+        self.rich_after = kexcel.rich_simplify(ca)
+        self.left = self.get_context_simple(text, i, -1)
+        self.right = self.get_context_simple(text, i, +1)
+
+    def get_context_rich(self, text, i, d):
+        ctx = []
+        j = i + d
+        l = 0
+        while 0 <= j < len(text.compounds) and l < text.conc.config.context:
+            c = text.compounds[j]
+            l0, ctx0 = c.for_context_rich()
+            l += l0
+            ctx = ctx + ctx0 if d > 0 else ctx0 + ctx
+            j += d
+        return ctx
+
+    def get_context_simple(self, text, i, d):
+        CTX_WORDS = 4
+        ctx = []
+        j = i + d
+        while 0 <= j < len(text.compounds) and len(ctx) < CTX_WORDS:
+            c = text.compounds[j]
+            if c.has_word:
+                ctx.append(c.lemma)
+            j += d
+        return u' '.join(ctx)
+
+    def get_this_rich(self):
+        l, ctx = self.for_context_rich()
+        return ctx
+
+    def for_context_rich(self):
+        match = len(self.match) > 0
+        l = 0
+        ctx = []
+        for t in self.tokens:
+            if not t.delete:
+                fmt, txt = t.for_context_rich(match)
+                l += len(txt)
+                ctx.append((fmt, txt))
+        return l, ctx
 
 
 class Sample(object):
@@ -198,7 +243,10 @@ class Text(object):
             self.fullname += u": " + self.name
 
     def process(self):
-        self.clean()
+        self.process_delete()
+        self.process_compound()
+        self.do_match()
+        self.process_context_sample()
         self.report()
 
     def write(self):
@@ -222,42 +270,96 @@ class Text(object):
                 cgi.escape(self.fullname, quote=False),
                 cgi.escape(kstyle.css, quote=False)
             ))
-            for t in self.tokens:
-                f.write(t.html())
+            for c in self.compounds:
+                c.write(f)
             f.write(FOOT)
 
-    def clean(self):
-        m = len(self.conc.config.delete_pair)
-        stack = [ [] for x in xrange(m) ]
-        delete_range = []
+    def process_delete(self):
+        ranges = self.find_ranges("delete")
+        for i,j in ranges:
+            for k in xrange(i, j+1):
+                self.tokens[k].delete = True
+
+    def process_compound(self):
+        self.process_compound_tags()
+        if not self.conc.config.tag_breaks_word:
+            self.merge_words_broken_with_tags()
+        self.unmerge_if_needed()
+        self.build_compounds()
+
+    def process_compound_tags(self):
+        ranges = self.find_ranges("compound")
+        for i,j in ranges:
+            for k in xrange(i, j):
+                self.tokens[k].merge_next = True
+
+    def merge_words_broken_with_tags(self):
+        i = None
         for j,t in enumerate(self.tokens):
             if isinstance(t, Tag):
-                for x in t.delete_open:
+                pass
+            elif isinstance(t, Word):
+                if i is not None and i < j - 1:
+                    # case: Word Tag ... Word
+                    for k in xrange(i, j):
+                        self.tokens[k].merge_next = True
+                i = j
+            else:
+                i = None
+
+    def unmerge_if_needed(self):
+        # This is to handle strange cases where sample identifier
+        # happens to be in the middle of a compounds. Split compound.
+        for t in self.tokens:
+            if isinstance(t, Tag) and t.samplekey is not None:
+                t.merge_next = False
+
+    def build_compounds(self):
+        self.compounds = []
+        i = None
+        for j,t in enumerate(self.tokens):
+            if i is None:
+                i = j
+            if not t.merge_next:
+                self.compounds.append(Compound(self.tokens[i:j+1]))
+                i = None
+
+    def find_ranges(self, kind):
+        m = len(self.conc.config.delete_pair)
+        stack = [ [] for x in xrange(m) ]
+        r = []
+        for j,t in enumerate(self.tokens):
+            if isinstance(t, Tag):
+                for x in t.pairs[kind][0]:
                     stack[x].append(j)
-                for x in t.delete_close:
+                for x in t.pairs[kind][1]:
                     if len(stack[x]) == 0:
                         self.conc.warn(self.file.filename, u"{}: no matching opening tag".format(t.descr()))
                     else:
                         i = stack[x].pop()
-                        delete_range.append((i,j))
+                        r.append((i,j))
         for l in stack:
             for i in l:
                 t = self.tokens[i]
                 self.conc.warn(self.file.filename, u"{}: no matching closing tag".format(t.descr()))
-        for i,j in delete_range:
-            for k in xrange(i,j+1):
-                self.tokens[k].delete = True
+        return r
+
+    def do_match(self):
+        for c in self.compounds:
+            c.do_match(self.conc)
+
+    def process_context_sample(self):
         self.words = []
         samplekey = ()
-        for i,t in enumerate(self.tokens):
-            if isinstance(t, Tag) and t.samplekey is not None:
-                samplekey = t.samplekey
-            if isinstance(t, Word) and not t.delete:
+        for i,c in enumerate(self.compounds):
+            if c.samplekey is not None:
+                samplekey = c.samplekey
+            if c.has_word:
                 sample = self.get_sample(samplekey)
-                if len(t.match) > 0:
-                    t.set_context(self, i, sample)
-                self.words.append(t)
-                sample.words.append(t)
+                if len(c.match) > 0:
+                    c.set_context(self, i, sample)
+                self.words.append(c)
+                sample.words.append(c)
 
     def get_sample(self, samplekey):
         if samplekey not in self.samplemap:
@@ -439,9 +541,9 @@ class Search(object):
 
     def add(self, word, text):
         self.xs.write_number(self.xs.r)
-        self.xs.write_rich(word.before)
-        self.xs.write_string(word.simpletext)
-        self.xs.write_rich(word.after)
+        self.xs.write_rich(word.rich_before)
+        self.xs.write_rich(word.rich)
+        self.xs.write_rich(word.rich_after)
         self.xs.write_string(word.lemma)
         self.xs.write_string(word.lemma)
         self.xs.write_url(word.link(text), u"text")
@@ -449,8 +551,8 @@ class Search(object):
         self.xs.write_string(text.file.shortname)
         self.xs.write_string(text.name)
         self.xs.write_string(word.sample.name)
-        self.xs.write_number(word.line)
-        self.xs.write_number(word.char)
+        self.xs.write_number(word.tokens[0].line)
+        self.xs.write_number(word.tokens[0].char)
         self.xs.write_string(word.left)
         self.xs.write_string(word.right)
         self.xs.next_row()

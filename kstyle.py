@@ -3,11 +3,12 @@ u"""How to format Konko output."""
 excel_format = {
     u"bold":  {u'bold': True},
     u"hl":    {u'bold': True, u'font_color': u'#dd0000'},
-    u"key":   {u'align': u'center', u'bold': True},
+    u"key":   {u'align': u'center'},
     u"right": {u'align': u'right'},
     u"light": {u'font_color': u'#999999'},
 }
 
+# .c: compound
 # .s: separator
 # .t: tag
 # .w: word
@@ -30,20 +31,13 @@ css = u"""
     font-weight: 700;
 }
 :target {
-    color: #0a0;
+    border: 1px dotted #000;
     font-size: 1.5em;
+    background-color: #eee;
 }
-.w:hover {
+.c:hover {
     color: #fff;
     background-color: #000;
-}
-.t:hover {
-    color: #fff;
-    background-color: #00c;
-}
-.s:hover {
-    color: #fff;
-    background-color: #c00;
 }
 
 """

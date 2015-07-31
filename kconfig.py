@@ -18,6 +18,9 @@ class KConfig(object):
         self.search = []
         self.delete = []
         self.delete_pair = []
+        self.compound_pair = []
+        self.tag_breaks_word = True
+        self.separators_in_compound = False
         self.text = None
         self.sample = None
         self.tag = None
@@ -113,8 +116,16 @@ class KConfig(object):
             elif key == u'skip-files':
                 self.expect_string_list(p, v)
                 self.skip_files += v
+            elif key == u'tag-breaks-word':
+                self.expect(p, bool, v)
+                self.tag_breaks_word = v
+            elif key == u'separators-in-compound':
+                self.expect(p, bool, v)
+                self.separators_in_compound = v
             elif key == u'delete':
                 self.set_delete(p, v)
+            elif key == u'compound':
+                self.set_compound(p, v)
             elif key == u'text':
                 self.expect(p, unicode, v)
                 self.text = kutil.safe_regex(v, self.tag_flags)
@@ -151,6 +162,12 @@ class KConfig(object):
             p = path + [i]
             self.set_delete_one(p, x)
 
+    def set_compound(self, path, v):
+        self.expect(path, list, v)
+        for i, x in enumerate(v):
+            p = path + [i]
+            self.set_compound_one(p, x)
+
     def set_delete_one(self, path, v):
         self.expect_string_list(path, v)
         l = [kutil.safe_regex(x, self.tag_flags) for x in v]
@@ -160,3 +177,11 @@ class KConfig(object):
             self.delete_pair.append(l)
         else:
             self.error(path, u'expected 1 or 2 elements')
+
+    def set_compound_one(self, path, v):
+        self.expect_string_list(path, v)
+        l = [kutil.safe_regex(x, self.tag_flags) for x in v]
+        if len(l) == 2:
+            self.compound_pair.append(l)
+        else:
+            self.error(path, u'expected 2 elements')
